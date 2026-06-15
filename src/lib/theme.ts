@@ -1,0 +1,28 @@
+// SportsWeb One token set — kept in sync with the prototype and index.css vars.
+export const T = {
+  ink: "#15191E",
+  navy: "#0B1424",
+  navy2: "#16223B",
+  navy3: "#1E2E4D",
+  paper: "#F4F1E8",
+  card: "#FFFFFF",
+  red: "#E1342E",
+  redDeep: "#B5231E",
+  redSoft: "#FBE5E3",
+  green: "#15875A",
+  greenSoft: "#E2F1E9",
+  amber: "#C9870A",
+  amberSoft: "#FBEFD5",
+  blue: "#2C5BAA",
+  blueSoft: "#E5ECF7",
+  line: "#E8E2D5",
+  lineDark: "#26344F",
+  muted: "#7A746A",
+  mutedNavy: "#9DB0CE",
+} as const;
+
+export const F = {
+  disp: "'Big Shoulders Display', sans-serif",
+  body: "'Outfit', sans-serif",
+  mono: "'Geist Mono', ui-monospace, monospace",
+} as const;

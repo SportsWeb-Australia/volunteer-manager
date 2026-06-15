@@ -1,0 +1,82 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+import { useEntitlement } from "../hooks/useEntitlement";
+import { Card, SectionHead, Pill, Icon, Btn, Loading } from "../components/ui";
+import { T } from "../lib/theme";
+
+interface Plan {
+  id: string; key: string; name: string; blurb: string | null;
+  tier_rank: number; price_monthly: number | null;
+  included_in_sportsweb_tiers: string[] | null;
+  features: { flags?: Record<string, boolean> };
+}
+
+const HIGHLIGHTS: [string, string][] = [
+  ["ai_roster_builder", "AI roster builder"],
+  ["channel_sms", "SMS messages"],
+  ["channel_push", "Web push"],
+  ["automated_reminders", "Automated reminders"],
+  ["advanced_reports", "Advanced reports & exports"],
+  ["surveys", "Surveys"],
+  ["recognition_automation", "Recognition automation"],
+  ["association_rollups", "Association rollups"],
+  ["api_access", "API access"],
+];
+
+export function Billing() {
+  const { plan: currentKey } = useEntitlement();
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("volunteer_plans")
+        .select("id,key,name,blurb,tier_rank,price_monthly,included_in_sportsweb_tiers,features")
+        .is("club_id", null).eq("status", "active").order("tier_rank");
+      if (!cancelled) { setPlans((data as Plan[]) ?? []); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) return <Loading />;
+
+  return (
+    <div className="fade">
+      <SectionHead eyebrow="Plan & billing" title="Your plan"
+        sub="Volunteer Manager is free at certain SportsWeb One tiers, or available standalone. Checkout & changes run through the billing-sync Edge Function (Phase C)." />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 14 }}>
+        {plans.map(p => {
+          const current = p.key === currentKey;
+          const flags = p.features?.flags ?? {};
+          return (
+            <Card key={p.id} pad={20} style={{ border: current ? `2px solid ${T.red}` : `1px solid ${T.line}`, position: "relative" }}>
+              {current && <span style={{ position: "absolute", top: 14, right: 14 }}><Pill bg={T.redSoft} fg={T.red}>Your plan</Pill></span>}
+              <div className="disp" style={{ fontSize: 22 }}>{p.name.replace("Volunteer Manager — ", "")}</div>
+              <div style={{ margin: "6px 0 12px" }}>
+                <span className="disp" style={{ fontSize: 30, color: T.ink }}>{p.price_monthly ? `$${p.price_monthly}` : "Free"}</span>
+                {p.price_monthly ? <span style={{ color: T.muted, fontSize: 13 }}> /mo</span> : null}
+              </div>
+              {p.blurb && <p style={{ fontSize: 13, color: T.muted, margin: "0 0 12px", minHeight: 56 }}>{p.blurb}</p>}
+              {(p.included_in_sportsweb_tiers?.length ?? 0) > 0 && (
+                <div style={{ fontSize: 11.5, color: T.green, marginBottom: 12, fontWeight: 600 }}>
+                  Free on SportsWeb One: {p.included_in_sportsweb_tiers!.map(t => t.replace("sw1_", "")).join(", ")}
+                </div>
+              )}
+              <div style={{ display: "grid", gap: 7, marginBottom: 16 }}>
+                {HIGHLIGHTS.map(([k, label]) => (
+                  <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: flags[k] ? T.ink : "#B8B2A4" }}>
+                    <Icon n={flags[k] ? "check" : "x"} s={14} c={flags[k] ? T.green : "#C7C0B0"} />{label}
+                  </div>
+                ))}
+              </div>
+              {current
+                ? <Btn kind="ghost" full>Current plan</Btn>
+                : <Btn kind="primary" icon="bolt" full onClick={() => alert("Wires to billing-sync / checkout in Phase C.")}>Choose {p.name.replace("Volunteer Manager — ", "")}</Btn>}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
