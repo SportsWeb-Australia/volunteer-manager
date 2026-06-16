@@ -1,272 +1,94 @@
-# SportsWeb One — Club Website Template
+# SportsWeb One — Volunteer Manager
 
-A reusable football/netball club website, built as **template #1** of the SportsWeb
-One system. **Client zero: Dookie United Football & Netball Club (DUFNC).**
+A core SportsWeb One module: recruit, roster, support and recognise local sports-club
+volunteers with minimal admin. AI prepares; humans approve.
 
-Everything a club shows is driven by a single typed content file
-(`src/content/club.config.ts`). Layout and components stay fixed; clubs change
-content and pick a design — that's the whole template idea.
+Stack: **Vite + React + TypeScript + Supabase**, deployed on Vercel via the
+`SportsWeb-Australia` GitHub org — same workflow as the rest of SportsWeb One.
 
----
+## What's wired in this scaffold
 
-## Stack
+- **Design system** — Big Shoulders / Outfit / Geist Mono, SportsWeb red on warm
+  paper, card + traffic-light UI, the "review chip" signature. (`src/lib/theme.ts`, `src/index.css`)
+- **Supabase data layer** — Dashboard, People, Roles, Rosters, Compliance,
+  Communications, Reports and Billing read live from the Phase A schema.
+- **Entitlements** — `useEntitlement()` calls the `vm_effective_features()` SQL gate;
+  `<Gate feature="...">` shows the feature or an upgrade prompt. This is how
+  "free at a SportsWeb One tier" and "standalone" behave identically in the UI.
+- **Dual experience** — the sidebar "Viewing as" switch flips to the airy
+  volunteer/parent self-service view.
 
-- **Vite + React + TypeScript**
-- **react-router-dom** for routing
-- Plain CSS with design tokens (no UI framework — keeps the build light and portable)
-- Google Fonts: Big Shoulders Display / Outfit / Geist Mono (the SportsWeb brand type system)
-- Deploys on **Vercel** (SPA rewrite in `vercel.json`)
+Screens marked "Ports from the prototype" reuse the same components — the rich
+interactions already exist in the standalone prototype and drop in here.
 
-## Run it
+## Local run
 
 ```bash
 npm install
-npm run dev      # local dev server
-npm run build    # production build to /dist
-npm run preview  # preview the production build
+cp .env.example .env        # fill in your Supabase URL + anon key
+npm run dev                 # http://localhost:5173
 ```
 
-## Design variants
+The app expects a signed-in Supabase session and a `team_members` row linking the
+user to a club. In production the host SportsWeb One shell supplies the session.
 
-The same content renders in eight visual templates, chosen by `variant` in the config.
+## Prerequisites (already done in Phase A)
 
-**Text/motif-led** (the club's diagonal-stripe signature; no photography needed):
+Run these in the Supabase SQL Editor, in order:
+1. `volunteer_manager_schema.sql`
+2. `volunteer_manager_entitlements.sql`
 
-- **`heritage`** — light, clean, community/sponsor-friendly (default).
-- **`broadcast`** — dark, bold, match-day broadcast energy.
-- **`arena`** — sharp-edged, flat, high-contrast sporting look with a black hero.
-- **`classic`** — silver-toned, rounded, soft premium-heritage feel.
+Then grant your club an entitlement (service-role / SQL editor):
 
-**Media-led** (image or video hero, distinct layouts — see `hero.backgroundImage`,
-`hero.video`, `hero.poster`):
-
-- **`stadium`** — full-bleed photo/video hero, dark gradient, text bottom-left, a
-  scoreboard-style stats strip; light content pages (Oswald).
-- **`editorial`** — magazine layout: image to one side with the headline in an
-  overlapping card, serif headlines (Playfair Display).
-- **`momentum`** — diagonal split hero (solid block + clipped image), energetic
-  condensed type (Saira Condensed), sharp edges.
-- **`coastal`** — airy and minimal, a calm light-washed image band, centred type
-  with lots of whitespace (Space Grotesk).
-
-The media heroes use the bundled placeholder images (`/public/hero-dark.jpg`,
-`/hero-light.jpg`) by default — set `hero.backgroundImage` (or `hero.video` +
-`hero.poster`) to use a real photo/clip. Video autoplays muted/looping with the
-poster as fallback.
-
-While `showVariantSwitcher: true`, a floating **Design** toggle (bottom-right) lets a
-club preview all eight live. **Set `showVariantSwitcher: false` for production** once a
-design is locked. For production, also trim `index.html` to just the chosen design's
-fonts.
-
-## Make a new club from this template
-
-1. Copy the project.
-2. Edit `src/content/club.config.ts` — identity, colours, sponsors, teams, news, etc.
-3. Drop the club logo into `public/` and point `identity.logo` at it.
-4. Set `identity.colours` — those four values are the only colours that change; the
-   whole theme (both variants) re-derives from them at runtime.
-5. Pick a `variant`.
-
-No component or CSS edits needed for a standard reskin.
-
-## Content model
-
-`src/content/types.ts` is the schema the future SportsWeb One admin dashboard maps
-onto. `blocks` toggles turn whole homepage sections on/off per club.
-
-## Connect to SportsWeb One (Supabase)
-
-The site reads live content from the SportsWeb One Supabase project and falls back
-to the bundled `club.config.ts` for anything the DB doesn't hold — so the site is
-always complete, and works even before any env vars are set.
-
-- `src/lib/supabase.ts` — the client (env-driven, with a fallback to the SportsWeb
-  One project so it works out of the box).
-- `src/lib/loadClub.ts` — fetches the club + its news / events / sponsors / teams /
-  committee by `clubs.slug`, maps them to `ClubConfig`, and merges over the static
-  defaults. Any failure → bundled config.
-
-### Setup
-
-Set these in Vercel (Project → Settings → Environment Variables) and locally in `.env`:
-
-```
-VITE_SUPABASE_URL=https://uzibfawcwoapfbigpzum.supabase.co
-VITE_SUPABASE_ANON_KEY=your-publishable-anon-key
-VITE_CLUB_SLUG=dookie-united   # which club this deployment renders
+```sql
+insert into public.volunteer_entitlements (club_id, plan_id, source, biller, status)
+select '<CLUB_UUID>', id, 'manual', 'manual', 'active'
+from public.volunteer_plans where key = 'vm_club';
 ```
 
-The anon key is the publishable key (safe in the browser, RLS-protected). The
-service-role key must never go in front-end code.
+## Deploy (when ready — I'll walk this click-by-click)
 
-### Table → template mapping
+1. Push this folder to a new repo under the `SportsWeb-Australia` org.
+2. Vercel → New Project → import the repo → Framework: **Vite**.
+3. Environment Variables → add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+4. Deploy. `vercel.json` already handles SPA routing.
 
-| Supabase | ClubConfig |
-| --- | --- |
-| `clubs` | identity (name, slug, logo_url, colours from primary/secondary), contact |
-| `clubs.selected_template_id` → `templates.template_key` | design `variant` |
-| `news` (published) | news (title, summary→excerpt, published_at→date) |
-| `events` (published, upcoming) | events |
-| `sponsors` (published) | sponsors (sponsor_level→tier) |
-| `teams` (published) | teams (grouped by sport) |
-| `people` (committee-type roles) | committee |
+## Edge Functions (in supabase/functions/)
 
-`template_key` → variant is set in `loadClub.ts` (`default`→heritage,
-`afl-classic`→arena, `club-modern`→broadcast). Add a row whose key maps to
-`classic` to expose the fourth design.
+| Function | Does | Secrets |
+|---|---|---|
+| `build-roster` | AI fair draft roster, proposes only | optional `ANTHROPIC_API_KEY` |
+| `approve-roster` | Commits an approved draft into assignments | — |
+| `dispatch-message` | Sends approved messages (SMS/email/push) | Twilio / ZeptoMail / WebPushr |
+| `message-webhook` | Provider delivery events → recipient status | `VM_WEBHOOK_SECRET` |
+| `billing-sync` | Activates/cancels module + sets plan tier | `VM_WEBHOOK_SECRET` |
+| `public-signup` | Unauthenticated QR/link signup → applications | — |
+| `shift-checkin` | NFC tap / QR scan → marks the shift attended | — |
 
-### Known gaps (need a schema/admin decision)
+### Shift check-in (NFC / QR)
+Turned on per club in **Settings → Shift check-in** (Off / QR / NFC / Both).
+- A **club** QR/NFC (`/checkin?c=<token>`) is reusable — pin or stick it at the ground; it checks the volunteer into their shift for today.
+- A **per-shift** QR (`/checkin?s=<token>`) prints on the run sheet (button on each shift card).
+- NFC works by writing the same URL to a tag (any "NFC Tools" app) — no app for the volunteer, they just tap.
 
-1. **Colours** — `clubs` stores two (primary/secondary); this template themes on
-   four (ink/paper/accent/silver). It derives ink + accent heuristically; for
-   precise control, add explicit `accent_colour` / `ink_colour` columns.
-2. **Multi-sport clubs** — `clubs.sport_type` is single and `teams` has no sport
-   column, so football + netball can't be grouped separately. Add `teams.sport_type`
-   (or `sport`) for clubs like Dookie that run both.
-3. **News** — no `category` or `image_url` columns (defaults to "News", no image).
-4. **Club documents/policies** — no club-level documents table (volunteer_documents
-   is volunteer-only). Add one (label, kind, file_url, status, display_order).
-5. **Freeform copy** — hero text, President's welcome, About, nav and footer come
-   from the bundled config. Wire these to the `pages` table once its columns are
-   confirmed.
-6. **Committee** — `people.roles` is used with a keyword filter; a `display_on_website`
-   flag (and order) would be cleaner.
-7. **Match centre** — stays on the GameDay/PlayHQ embed; no fixtures tables needed.
+## Going live (when you're ready to test — I'll walk it click-by-click)
 
-Editing still happens in the SportsWeb One admin (which writes to these tables);
-this site reflects those edits live.
+1. **DB**: run `sportsweb_volunteer_manager.sql`, then `sportsweb_volunteer_manager_addendum.sql` (adds the delivery index + check-in columns). Optional: `sportsweb_volunteer_manager_seed.sql` for sample data. Enable the module + set a plan (done).
+2. **Deploy functions**:
+   `supabase functions deploy build-roster approve-roster dispatch-message`
+   `supabase functions deploy public-signup shift-checkin message-webhook --no-verify-jwt`
+   `supabase functions deploy billing-sync` *(call it server-to-server with the secret)*
+3. **Secrets** (only the channels you use):
+   `supabase secrets set VM_WEBHOOK_SECRET=… TWILIO_ACCOUNT_SID=… TWILIO_AUTH_TOKEN=… TWILIO_FROM=… ZEPTOMAIL_TOKEN=… ZEPTOMAIL_FROM=… WEBPUSHR_KEY=… WEBPUSHR_AUTH_TOKEN=…`
+4. **App**: deploy this repo to Vercel (Framework: Vite) with `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
+5. **Provider callbacks**: point Twilio status callback + ZeptoMail webhook at
+   `https://<project>.functions.supabase.co/message-webhook?key=<VM_WEBHOOK_SECRET>`.
 
-## Club admin (self-serve editing)
+## What's live vs fast-follow
+- **Live flows**: dashboard, people, roles, compliance, opportunities + public signup,
+  AI roster (build → approve), communications (approve → send), reports, billing/plans.
+- **Fast-follow (still prototype stubs)**: Game Day templates, Recognition, Surveys,
+  Onboarding, Settings — the components exist in the standalone prototype and port in.
+- **Needs seed data to look alive**: add a few `people` + `volunteers` + `volunteer_shifts`
+  rows for your test club, or they'll show empty states (which is correct behaviour).
 
-A built-in admin lets club staff edit their own content. Visit **`/admin`**.
-
-- Sign in with Supabase Auth (email + password).
-- The signed-in user is matched to a club via `club_users(user_id, club_id, role)`.
-- CRUD for **news, events, sponsors and teams**, scoped to that club.
-- Security is enforced by **row-level security**, not the UI. Run
-  `supabase/admin-policies.sql` (adjust table names if needed) so members can only
-  read/write their own club's rows, and the public can read published rows.
-
-Setup per club: create the user in Supabase Auth, add a `club_users` row linking
-them to their `club_id`. The admin shares the site's env vars; no extra config.
-
-This admin lives in the template for now. Longer term it can move into the central
-SportsWeb One app so auth/roles live in one place and club sites stay read-only —
-the table contract is identical either way.
-
-## PWA (installable + push)
-
-- `public/manifest.webmanifest` + icons + `public/sw.js` make the site installable
-  and offline-capable (content stays network-first so it's never stale).
-- An **install prompt** appears on supported devices (with iOS "Add to Home Screen"
-  instructions); a **push opt-in** prompt requests notification permission.
-- Push delivery is provider-agnostic. Set `VITE_VAPID_PUBLIC_KEY` and
-  `VITE_PUSH_SUBSCRIBE_URL` (e.g. a Supabase Edge Function) to store subscriptions;
-  the SW's `push` handler shows the notification. Without those, the prompt still
-  captures permission. (If SportsWeb One sends via WebPushr, point the subscribe
-  step there instead.)
-- Manifest name/colours are Dookie's; generate per club for production.
-
-## Sponsor layouts
-
-Not every club ranks sponsors. `sponsorDisplay` controls presentation:
-`"tiered"` (platinum/gold/silver, default), `"flat"` (one equal logo wall), or
-`"featured"` (top tier large, the rest in a wall). Map it from an optional
-`clubs.sponsor_display` column.
-
-## Mobile
-
-An app-style bottom tab bar (Home / Fixtures / News / Join / Club) appears on
-phones; the desktop header hides on mobile. Everything is responsive across phone,
-tablet and desktop.
-
-## Teams: sport & program pages
-
-Teams are structured so each program has its own page:
-
-- `/football`, `/netball` — per-sport landing pages listing only that sport's programs.
-- `/program/:slug` — a single program (e.g. Seniors & Reserves) with its grades and
-  details, plus links to sibling programs and the other sport.
-- `/teams` — a combined overview linking into both.
-
-Programs live in `club.config.ts` under `teams[]` (each with a `slug`, `grades`,
-and `href`). The nav dropdowns point at these routes.
-
-## SEO
-
-- Per-page `<title>` + meta description + canonical + Open Graph are set by
-  `SeoManager` (static routes) and `useSeo` (sport/program pages) in `src/lib/seo.ts`.
-- `index.html` carries default meta + `SportsOrganization` JSON-LD.
-- `public/robots.txt`, `public/sitemap.xml` (update the domain on go-live), and icons.
-- Note: this is a client-rendered SPA, so JS-aware crawlers (Google) see per-page tags,
-  but some social scrapers only read `index.html`'s defaults. For per-page social cards,
-  add a prerender/SSG step — happy to wire that when the domain is set.
-
-## Redirects (go-live)
-
-`vercel.json` has the SPA rewrite (so deep links like `/football` work on refresh) and
-a `redirects` array for 301s. On go-live, add the canonical host redirect (apex↔www)
-and any old→new URL maps there, e.g.:
-
-```json
-{ "source": "/old-news/:slug", "destination": "/news", "permanent": true }
-```
-
-## Match Centre
-
-Three modes, set by `matchCentre.mode` in the config:
-
-- **`manual`** (current) — fixtures/results/ladder come straight from the config.
-- **`embed`** — renders the provider's live pages (GameDay for football) in an
-  iframe, one per tab. Auto-updates when the league uploads results; no API key.
-- **`api`** — implement `fetchFromApi()` in `src/lib/matchData.ts`.
-
-A **Live source** bar (Football → GameDay, Netball → PlayHQ, League site) shows in
-every mode, so the live data is always one tap away.
-
-### Turning on the GameDay embed
-
-1. Open the GameDay competitions hub:
-   `websites.mygameday.app/assoc_page.cgi?c=0-6191-0-645511-0&a=COMPS`
-2. Click **2026 Seniors → Fixture**. Copy that page URL.
-3. Do the same for **Results** and **Ladder** (and optionally filter to Dookie United).
-4. Paste the three URLs into `matchCentre.embed` (`fixtures` / `results` / `ladder`)
-   in `src/content/club.config.ts`.
-5. Set `matchCentre.mode: "embed"`.
-
-Note: some provider pages send `X-Frame-Options`, which can block iframing. If a tab
-shows blank, the embed panel's **Open ↗** link still works, or stay on `manual`. The
-GameDay account admin can confirm/allow framing or supply an official widget.
-
-Netball lives on PlayHQ; the Live source bar links there until a netball feed/embed is added.
-
-## Data source reference
-
-- Football (Seniors, Reserves, U14, U17): **GameDay** — `websites.mygameday.app`,
-  PDFNL association id `0-6191-0-645511-0`.
-- Netball + registration: **PlayHQ** — org `picola-and-district-football-netball-league/ffc532a8`.
-- League site: `pdfnl.com`.
-
-## What still needs real content (placeholders)
-
-Items marked `placeholder: true` in the config render a small **Placeholder** flag in
-the UI so they're easy to spot. Before launch, confirm/supply:
-
-- **News** — currently three sample posts.
-- **Events** — currently three sample events.
-- **Committee** — only the President is real; the rest are role placeholders.
-- **Documents** — labels are in; real files/links needed.
-- **Match data** — sample fixtures/results/ladder, or wire the API.
-- **Hero photo** — `hero.backgroundImage` is empty (the diagonal motif shows instead).
-- **Registration / store URLs** — confirm live PlayHQ + Hip Pocket store links.
-- **Sponsor tiers** — current Major/Gold/Community split is a starting placement.
-- **President portrait** — initials show until a photo is added.
-
-## Note on the build
-
-This source was authored without a local `npm install`/build step available in the
-authoring environment, so the production build is verified by Vercel on push rather
-than locally. The code uses only standard, current dependencies and a conventional
-Vite + React + TS structure. A filesystem import/export check was run over all
-modules before delivery.
