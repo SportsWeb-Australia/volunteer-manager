@@ -28,13 +28,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasSupabaseConfig) { setReady(true); return; }
     let cancelled = false;
+    let resolved = false; // becomes true after the first club resolution
 
     // Resolve the signed-in user's club. In production the host SportsWeb One
     // shell shares its session; standalone we read club_users for this user.
     const resolve = async (session: import("@supabase/supabase-js").Session | null) => {
       if (cancelled) return;
       if (!session) {
-        setSignedIn(false); setClubId(null); setClubName(null); setReady(true); return;
+        setSignedIn(false); setClubId(null); setClubName(null); setReady(true); resolved = true; return;
       }
       setSignedIn(true);
       try {
@@ -55,13 +56,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Could not load your club.");
       } finally {
-        if (!cancelled) setReady(true);
+        if (!cancelled) { setReady(true); resolved = true; }
       }
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => resolve(session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setReady(false);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // Supabase fires TOKEN_REFRESHED / USER_UPDATED (and a duplicate SIGNED_IN)
+      // when the tab regains focus. Re-resolving on those is fine, but flipping
+      // `ready` back to false remounts the app and wipes any in-progress form
+      // state — so only react to genuine sign-in / sign-out transitions, and
+      // never reset `ready` after the first load.
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
+      if (event === "SIGNED_OUT") {
+        setSignedIn(false); setClubId(null); setClubName(null); return;
+      }
+      if (event === "SIGNED_IN" && resolved) return; // duplicate fired on focus
       resolve(session);
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };

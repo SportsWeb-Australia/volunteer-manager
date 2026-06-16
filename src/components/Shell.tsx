@@ -83,7 +83,7 @@ function PlanBadge() {
 export function Shell() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="shell" style={{ display: "flex", minHeight: "100vh", maxWidth: 1320, margin: "0 auto" }}>
+    <div className="shell" style={{ display: "flex", minHeight: "100vh" }}>
       <aside className="desktop-nav" style={{ width: 252, background: T.navy, flex: "0 0 252px", padding: "20px 14px", position: "sticky", top: 0, alignSelf: "flex-start", height: "100vh", overflowY: "auto" }}>
         <Brand />
         <NavList />

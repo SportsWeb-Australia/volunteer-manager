@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     const results: Record<string, { sent: number; failed: number; provider_ref?: string; error?: string }> = {};
 
     for (const ch of channels) {
-      const provider = ch === "sms" ? "twilio" : ch === "email" ? "zoho_campaigns" : "webpushr";
+      const provider = ch === "sms" ? "twilio" : ch === "email" ? "zeptomail" : "webpushr";
       const { data: dispatch } = await db.from("volunteer_message_dispatches")
         .insert({ club_id: club, message_id, channel: ch, provider, status: "sending" }).select("id").single();
       const dispatchId = dispatch?.id as string | undefined;

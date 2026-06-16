@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
     const { data: suggestion, error: insErr } = await db.from("volunteer_ai_suggestions").insert({
       club_id, type: "roster", title: "Draft roster ready for review", summary,
       payload: { roster_id: roster_id ?? null, options: opt, assignments },
-      confidence: Number(avg.toFixed(3)), status: "needs_review", created_by: "ai",
+      confidence: Number(avg.toFixed(3)), status: "needs_review", created_by: null,
     }).select("id").single();
     if (insErr) return json(500, { error: "could not save suggestion", detail: insErr.message });
 
