@@ -9,7 +9,7 @@ const NAV: [string, string, string][] = [
   ["Dashboard", "/", "grid"],
   ["Volunteer People", "/people", "people"],
   ["Roles & Descriptions", "/roles", "role"],
-  ["Opportunities", "/opportunities", "mega"],
+  ["Volunteer Sign-ups", "/opportunities", "mega"],
   ["Rosters & Shifts", "/rosters", "cal"],
   ["Game Day Jobs", "/game-day", "whistle"],
   ["Events", "/events", "spark"],

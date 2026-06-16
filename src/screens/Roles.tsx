@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useApp } from "../context/AppContext";
 import type { VolunteerRole } from "../lib/types";
-import { Card, SectionHead, Pill, Icon, Loading, EmptyState, Btn } from "../components/ui";
+import { Card, SectionHead, Pill, Icon, Loading, EmptyState, Btn, Modal, Field, FormError, fieldInput } from "../components/ui";
 import { T } from "../lib/theme";
 
 const risk = (r: string): [string, string] =>
@@ -13,34 +13,64 @@ export function Roles() {
   const [rows, setRows] = useState<VolunteerRole[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // create modal
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [riskLevel, setRiskLevel] = useState("low");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = async () => {
     if (!clubId) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      // A club's active roles; fall back to the shared template library if none yet.
-      const { data: roles } = await supabase.from("volunteer_roles")
-        .select("id,club_id,title,category,risk_level,required_checks,reports_to,status")
-        .eq("club_id", clubId).eq("status", "active").order("title");
-      let result = (roles as VolunteerRole[]) ?? [];
-      if (result.length === 0) {
-        const { data: tmpl } = await supabase.from("volunteer_role_templates")
-          .select("id,title,category,risk_level,required_checks,reports_to")
-          .is("club_id", null).eq("is_system", true).order("title");
-        result = ((tmpl as unknown as VolunteerRole[]) ?? []);
-      }
-      if (!cancelled) { setRows(result); setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [clubId]);
+    setLoading(true);
+    // A club's active roles; fall back to the shared template library if none yet.
+    const { data: roles } = await supabase.from("volunteer_roles")
+      .select("id,club_id,title,category,risk_level,required_checks,reports_to,status")
+      .eq("club_id", clubId).eq("status", "active").order("title");
+    let result = (roles as VolunteerRole[]) ?? [];
+    if (result.length === 0) {
+      const { data: tmpl } = await supabase.from("volunteer_role_templates")
+        .select("id,title,category,risk_level,required_checks,reports_to")
+        .is("club_id", null).eq("is_system", true).order("title");
+      result = ((tmpl as unknown as VolunteerRole[]) ?? []);
+    }
+    setRows(result);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (clubId) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clubId]);
+
+  const openAdd = () => { setTitle(""); setCategory(""); setRiskLevel("low"); setErr(null); setAdding(true); };
+
+  const save = async () => {
+    if (!clubId) return;
+    const t = title.trim();
+    if (!t) { setErr("Please enter a role title."); return; }
+    setSaving(true); setErr(null);
+    try {
+      const { error } = await supabase.from("volunteer_roles").insert({
+        club_id: clubId, title: t, category: category.trim() || null,
+        risk_level: riskLevel, status: "active",
+      });
+      if (error) throw error;
+      setAdding(false);
+      await load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Could not create role.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fade">
       <SectionHead eyebrow="Role library" title="Roles & position descriptions"
-        sub="A ready-made library of local club roles. The one-sentence AI position-description generator ports from the prototype and writes to volunteer_roles."
-        right={<Btn icon="spark">Generate role</Btn>} />
+        sub="A ready-made library of common club roles — add your own and set its risk level and any required checks."
+        right={<Btn icon="role" onClick={openAdd}>New role</Btn>} />
       {loading ? <Loading />
-        : rows.length === 0 ? <EmptyState icon="role" title="No roles yet" sub="Add a role or generate one from a sentence." />
+        : rows.length === 0 ? <EmptyState icon="role" title="No roles yet" sub="Add the roles your club needs filled."
+            action={<Btn icon="role" onClick={openAdd}>New role</Btn>} />
         : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 12 }}>
             {rows.map(r => {
@@ -63,6 +93,31 @@ export function Roles() {
             })}
           </div>
         )}
+
+      {adding && (
+        <Modal title="New role" busy={saving} onClose={() => setAdding(false)}>
+          <Field label="Role title *">
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Canteen coordinator" style={fieldInput} />
+          </Field>
+          <Field label="Category (optional)">
+            <input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Game day" style={fieldInput} />
+          </Field>
+          <Field label="Risk level">
+            <select value={riskLevel} onChange={e => setRiskLevel(e.target.value)} style={{ ...fieldInput, textTransform: "capitalize" }}>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </Field>
+
+          {err && <FormError>{err}</FormError>}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+            <Btn kind="ghost" onClick={() => !saving && setAdding(false)}>Cancel</Btn>
+            <Btn onClick={save}>{saving ? "Saving…" : "Create role"}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

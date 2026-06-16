@@ -122,3 +122,38 @@ export function EmptyState({ icon = "spark", title, sub, action }: { icon?: stri
     </Card>
   );
 }
+
+// --- Form helpers (shared by the create/edit modals) ----------------------
+export const fieldInput: CSSProperties = {
+  width: "100%", padding: "10px 13px", borderRadius: 11, border: `1px solid ${T.line}`,
+  fontSize: 14, fontFamily: "inherit", background: "#fff", boxSizing: "border-box",
+};
+
+export function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label style={{ display: "block", marginBottom: 13 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: T.muted, marginBottom: 6 }}>{label}</div>
+      {children}
+    </label>
+  );
+}
+
+export function FormError({ children }: { children: ReactNode }) {
+  return <div style={{ background: T.redSoft, color: T.red, fontSize: 12.5, padding: "9px 12px", borderRadius: 10, marginBottom: 13 }}>{children}</div>;
+}
+
+export function Modal({ title, onClose, busy, children }: { title: string; onClose: () => void; busy?: boolean; children: ReactNode }) {
+  return (
+    <div onClick={() => !busy && onClose()}
+      style={{ position: "fixed", inset: 0, background: "rgba(7,12,22,.55)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 440, background: T.card, borderRadius: 18, border: `1px solid ${T.line}`, padding: 22, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h2 className="disp" style={{ fontSize: 22, margin: 0, color: T.ink }}>{title}</h2>
+          <button onClick={() => !busy && onClose()} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><Icon n="x" s={20} c={T.muted} /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

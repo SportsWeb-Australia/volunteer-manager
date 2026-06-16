@@ -19,7 +19,7 @@ const TOGGLES: [keyof Settings, string][] = [
   ["block_restricted_without_checks", "Block restricted roles without the required checks"],
   ["avoid_overuse", "Avoid overusing the same volunteers"],
   ["allow_self_select", "Let volunteers self-select shifts"],
-  ["publish_to_website", "Publish opportunities to the club website"],
+  ["publish_to_website", "Publish volunteer sign-ups to the club website"],
 ];
 const METHODS: [string, string, string][] = [
   ["off", "Off", "No check-in"],

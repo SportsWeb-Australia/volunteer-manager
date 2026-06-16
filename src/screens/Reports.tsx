@@ -41,6 +41,21 @@ export function Reports() {
     [value, "Volunteer value (mth)", T.green],
   ];
 
+  const exportCSV = () => {
+    const rows = [
+      ["Metric", "Value"],
+      ["Hours this month", String(hours)],
+      ["Active volunteers", String(active)],
+      ["Value per hour", String(perHour)],
+      ["Volunteer value (month)", String(hours * perHour)],
+    ];
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `volunteer-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="fade">
       <SectionHead eyebrow="For your committee" title="Reports"
@@ -59,8 +74,8 @@ export function Reports() {
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Advanced reports</div>
           <p style={{ fontSize: 13.5, color: T.muted, margin: "0 0 14px" }}>Hours by team & role, burnout watch, compliance gaps, and the season contribution report. Charts port from the prototype.</p>
           <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
-            <Btn kind="ghost" icon="report">Export PDF</Btn>
-            <Btn kind="ghost">CSV</Btn>
+            <Btn kind="ghost" icon="report" onClick={() => window.print()}>Export PDF</Btn>
+            <Btn kind="ghost" onClick={exportCSV}>CSV</Btn>
           </div>
         </Card>
       </Gate>

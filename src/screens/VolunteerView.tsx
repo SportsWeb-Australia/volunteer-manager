@@ -11,6 +11,7 @@ import { T } from "../lib/theme";
 export function VolunteerView() {
   const { clubName, setViewer } = useApp();
   const [resp, setResp] = useState<Record<number, string>>({});
+  const [checkedIn, setCheckedIn] = useState(false);
   const set = (i: number, v: string) => setResp(p => ({ ...p, [i]: v }));
 
   return (
@@ -29,7 +30,9 @@ export function VolunteerView() {
             <div className="disp" style={{ fontSize: 22, color: "#fff" }}>BBQ · Saturday</div>
             <div style={{ fontSize: 13, color: T.mutedNavy, marginTop: 4 }}>9:00am–12:00pm · Oval gate</div>
           </div>
-          <Btn kind="green" icon="check">Check in</Btn>
+          {checkedIn
+            ? <Pill bg={T.greenSoft} fg={T.green}>✓ Checked in</Pill>
+            : <Btn kind="green" icon="check" onClick={() => setCheckedIn(true)}>Check in</Btn>}
         </div>
       </Card>
 

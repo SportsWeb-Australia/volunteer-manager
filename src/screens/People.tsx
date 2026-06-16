@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useApp } from "../context/AppContext";
 import type { Volunteer, VolunteerStatus } from "../lib/types";
-import { Card, SectionHead, Avatar, StatusPill, Loading, EmptyState, Btn, Icon } from "../components/ui";
+import { Card, SectionHead, Avatar, StatusPill, Loading, EmptyState, Btn, Modal, Field, FormError, fieldInput } from "../components/ui";
 import { T } from "../lib/theme";
 
 const PALETTE = [T.red, T.navy3, "#5A6B2B", "#7A4A1E", T.blue, "#7A2B57", "#1E6E5C"];
@@ -10,19 +10,7 @@ const ci = (s: string) => PALETTE[(s.charCodeAt(0) + s.length) % PALETTE.length]
 const FILTERS = ["All", "active", "applied", "approved", "paused", "prospect"];
 const ADD_STATUSES: VolunteerStatus[] = ["active", "approved", "applied", "prospect", "paused"];
 
-const inputStyle: CSSProperties = {
-  width: "100%", padding: "10px 13px", borderRadius: 11, border: `1px solid ${T.line}`,
-  fontSize: 14, fontFamily: "inherit", background: "#fff", boxSizing: "border-box",
-};
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label style={{ display: "block", marginBottom: 13 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: T.muted, marginBottom: 6 }}>{label}</div>
-      {children}
-    </label>
-  );
-}
+const SELECT = "id,status,person:people(id,full_name,mobile,email),profile:volunteer_profiles(preferred_roles,internal_tags)";
 
 export function People() {
   const { clubId } = useApp();
@@ -43,29 +31,12 @@ export function People() {
   const load = async () => {
     if (!clubId) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("volunteers")
-      .select("id,status,person:people(id,full_name,mobile,email),profile:volunteer_profiles(preferred_roles,internal_tags)")
-      .eq("club_id", clubId)
-      .order("status");
+    const { data } = await supabase.from("volunteers").select(SELECT).eq("club_id", clubId).order("status");
     setRows((data as unknown as Volunteer[]) ?? []);
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (!clubId) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const { data } = await supabase
-        .from("volunteers")
-        .select("id,status,person:people(id,full_name,mobile,email),profile:volunteer_profiles(preferred_roles,internal_tags)")
-        .eq("club_id", clubId)
-        .order("status");
-      if (!cancelled) { setRows((data as unknown as Volunteer[]) ?? []); setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [clubId]);
+  useEffect(() => { if (clubId) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clubId]);
 
   const openAdd = () => {
     setFullName(""); setMobile(""); setEmail(""); setStatus("active"); setErr(null);
@@ -133,7 +104,7 @@ export function People() {
 
       {loading ? <Loading />
         : list.length === 0
-        ? <EmptyState icon="people" title="No volunteers yet" sub="Add one directly, or they'll appear here once people put their hand up through an opportunity."
+        ? <EmptyState icon="people" title="No volunteers yet" sub="Add one directly, or they'll appear here once people put their hand up through a sign-up."
             action={<Btn icon="people" onClick={openAdd}>Add volunteer</Btn>} />
         : (
           <Card pad={0} style={{ overflow: "hidden" }}>
@@ -155,38 +126,29 @@ export function People() {
         )}
 
       {adding && (
-        <div onClick={() => !saving && setAdding(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(7,12,22,.55)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 440, background: T.card, borderRadius: 18, border: `1px solid ${T.line}`, padding: 22 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h2 className="disp" style={{ fontSize: 22, margin: 0, color: T.ink }}>Add volunteer</h2>
-              <button onClick={() => !saving && setAdding(false)} style={{ background: "transparent", border: "none", cursor: "pointer", padding: 4 }}><Icon n="x" s={20} c={T.muted} /></button>
-            </div>
+        <Modal title="Add volunteer" busy={saving} onClose={() => setAdding(false)}>
+          <Field label="Full name *">
+            <input autoFocus value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Jordan Smith" style={fieldInput} />
+          </Field>
+          <Field label="Mobile">
+            <input value={mobile} onChange={e => setMobile(e.target.value)} placeholder="0400 000 000" style={fieldInput} />
+          </Field>
+          <Field label="Email">
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" style={fieldInput} />
+          </Field>
+          <Field label="Status">
+            <select value={status} onChange={e => setStatus(e.target.value as VolunteerStatus)} style={{ ...fieldInput, textTransform: "capitalize" }}>
+              {ADD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
 
-            <Field label="Full name *">
-              <input autoFocus value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Jordan Smith" style={inputStyle} />
-            </Field>
-            <Field label="Mobile">
-              <input value={mobile} onChange={e => setMobile(e.target.value)} placeholder="0400 000 000" style={inputStyle} />
-            </Field>
-            <Field label="Email">
-              <input value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" style={inputStyle} />
-            </Field>
-            <Field label="Status">
-              <select value={status} onChange={e => setStatus(e.target.value as VolunteerStatus)} style={{ ...inputStyle, textTransform: "capitalize" }}>
-                {ADD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Field>
+          {err && <FormError>{err}</FormError>}
 
-            {err && <div style={{ background: T.redSoft ?? "#FBE9E8", color: T.red, fontSize: 12.5, padding: "9px 12px", borderRadius: 10, marginBottom: 13 }}>{err}</div>}
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-              <Btn kind="ghost" onClick={() => !saving && setAdding(false)}>Cancel</Btn>
-              <Btn onClick={saveVolunteer}>{saving ? "Saving…" : "Add volunteer"}</Btn>
-            </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+            <Btn kind="ghost" onClick={() => !saving && setAdding(false)}>Cancel</Btn>
+            <Btn onClick={saveVolunteer}>{saving ? "Saving…" : "Add volunteer"}</Btn>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

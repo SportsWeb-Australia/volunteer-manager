@@ -15,6 +15,33 @@ export function Compliance() {
   const { clubId } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const sendReminders = async () => {
+    if (!clubId) return;
+    setBusy(true); setNote(null);
+    try {
+      const affected = rows.filter(r => ["expiring_soon", "expired", "missing"].includes(r.status));
+      const ids = [...new Set(affected.map(r => r.volunteer_id))];
+      if (ids.length === 0) { setNote("All checks are valid — no reminders needed right now."); return; }
+      const { error } = await supabase.from("volunteer_messages").insert({
+        club_id: clubId,
+        title: "Compliance reminder",
+        subject: "Your club check needs updating",
+        body: "Hi {name}, one or more of your volunteer checks is expiring or has expired. Please renew it when you get a chance — thanks for keeping the club safe!",
+        channels: ["email"],
+        audience: { volunteer_ids: ids },
+        status: "draft",
+      });
+      if (error) throw error;
+      setNote(`Drafted an email reminder for ${ids.length} volunteer${ids.length === 1 ? "" : "s"}. Review and send it from Communications.`);
+    } catch (e: unknown) {
+      setNote(e instanceof Error ? e.message : "Could not draft reminders.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!clubId) return;
@@ -37,7 +64,8 @@ export function Compliance() {
     <div className="fade">
       <SectionHead eyebrow="Child safety first" title="Compliance"
         sub="Traffic lights on every check. Anyone red can't be assigned to a restricted role unless an authorised admin overrides."
-        right={<Gate feature="automated_reminders" fallback={null}><Btn icon="bell">Send expiry reminders</Btn></Gate>} />
+        right={<Gate feature="automated_reminders" fallback={null}><Btn icon="bell" onClick={sendReminders}>{busy ? "Drafting…" : "Send expiry reminders"}</Btn></Gate>} />
+      {note && <Card pad={13} style={{ marginBottom: 14, fontSize: 13.5, color: T.ink, background: T.greenSoft, borderColor: "#CDE6D8" }}>{note}</Card>}
       {loading ? <Loading />
         : rows.length === 0 ? <EmptyState icon="shield" title="No compliance records yet" sub="Checks appear here as volunteers upload WWCC, First Aid and other documents." />
         : (

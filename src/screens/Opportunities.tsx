@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useApp } from "../context/AppContext";
-import { Card, SectionHead, Pill, Icon, Loading, EmptyState, Btn } from "../components/ui";
+import { Card, SectionHead, Pill, Icon, Loading, EmptyState, Btn, Modal, Field, FormError, fieldInput } from "../components/ui";
 import { T } from "../lib/theme";
 
 interface Opp {
@@ -10,37 +10,79 @@ interface Opp {
   applications?: { count: number }[];
 }
 
+const SELECT = "id,title,starts_at,location,volunteers_needed,visibility,status,signup_token,applications:volunteer_applications(count)";
+
 export function Opportunities() {
   const { clubId } = useApp();
   const [opps, setOpps] = useState<Opp[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
 
-  useEffect(() => {
+  // create modal
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [when, setWhen] = useState("");
+  const [location, setLocation] = useState("");
+  const [needed, setNeeded] = useState("1");
+  const [visibility, setVisibility] = useState("public");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = async () => {
     if (!clubId) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const { data } = await supabase.from("volunteer_opportunities")
-        .select("id,title,starts_at,location,volunteers_needed,visibility,status,signup_token,applications:volunteer_applications(count)")
-        .eq("club_id", clubId).order("created_at", { ascending: false });
-      if (!cancelled) { setOpps((data as unknown as Opp[]) ?? []); setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [clubId]);
+    setLoading(true);
+    const { data } = await supabase.from("volunteer_opportunities").select(SELECT)
+      .eq("club_id", clubId).order("created_at", { ascending: false });
+    setOpps((data as unknown as Opp[]) ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (clubId) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clubId]);
 
   const linkFor = (token: string) => `${window.location.origin}/v/${token}`;
   const copy = async (token: string) => {
     try { await navigator.clipboard.writeText(linkFor(token)); setCopied(token); setTimeout(() => setCopied(null), 1800); } catch { /* ignore */ }
   };
 
+  const openAdd = () => {
+    setTitle(""); setWhen(""); setLocation(""); setNeeded("1"); setVisibility("public"); setErr(null);
+    setAdding(true);
+  };
+
+  const save = async () => {
+    if (!clubId) return;
+    const t = title.trim();
+    if (!t) { setErr("Please enter a title."); return; }
+    setSaving(true); setErr(null);
+    try {
+      const { error } = await supabase.from("volunteer_opportunities").insert({
+        club_id: clubId,
+        title: t,
+        starts_at: when ? new Date(when).toISOString() : null,
+        location: location.trim() || null,
+        volunteers_needed: Math.max(1, parseInt(needed, 10) || 1),
+        visibility,
+        status: "open",
+        signup_token: crypto.randomUUID(),
+      });
+      if (error) throw error;
+      setAdding(false);
+      await load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Could not create sign-up.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="fade">
-      <SectionHead eyebrow="Recruit · publish anywhere" title="Opportunities"
-        sub="Post a job once and share the public link or QR — members put their hand up in one tap, no login. Responses land in Applications for you to approve."
-        right={<Btn icon="mega">New opportunity</Btn>} />
+      <SectionHead eyebrow="Recruit · publish anywhere" title="Volunteer sign-ups"
+        sub="Post a sign-up once and share the public link or QR — members put their hand up in one tap, no login. Responses land in Applications for you to approve."
+        right={<Btn icon="mega" onClick={openAdd}>New sign-up</Btn>} />
       {loading ? <Loading />
-        : opps.length === 0 ? <EmptyState icon="mega" title="No opportunities yet" sub="Create one and share its link/QR to the website, socials or the ground." />
+        : opps.length === 0 ? <EmptyState icon="mega" title="No volunteer sign-ups yet" sub="Create one and share its link/QR to the website, socials or the ground."
+            action={<Btn icon="mega" onClick={openAdd}>New sign-up</Btn>} />
         : (
           <div style={{ display: "grid", gap: 12 }}>
             {opps.map(o => {
@@ -77,6 +119,36 @@ export function Opportunities() {
             })}
           </div>
         )}
+
+      {adding && (
+        <Modal title="New volunteer sign-up" busy={saving} onClose={() => setAdding(false)}>
+          <Field label="Title *">
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday canteen helpers" style={fieldInput} />
+          </Field>
+          <Field label="When (optional)">
+            <input type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} style={fieldInput} />
+          </Field>
+          <Field label="Location (optional)">
+            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Main oval canteen" style={fieldInput} />
+          </Field>
+          <Field label="Volunteers needed">
+            <input type="number" min={1} value={needed} onChange={e => setNeeded(e.target.value)} style={fieldInput} />
+          </Field>
+          <Field label="Visibility">
+            <select value={visibility} onChange={e => setVisibility(e.target.value)} style={{ ...fieldInput, textTransform: "capitalize" }}>
+              <option value="public">Public — share a sign-up link/QR</option>
+              <option value="internal">Internal — staff only</option>
+            </select>
+          </Field>
+
+          {err && <FormError>{err}</FormError>}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+            <Btn kind="ghost" onClick={() => !saving && setAdding(false)}>Cancel</Btn>
+            <Btn onClick={save}>{saving ? "Saving…" : "Create sign-up"}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
