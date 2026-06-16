@@ -1,71 +1,124 @@
-import { Routes, Route } from "react-router-dom";
-import { useApp } from "./context/AppContext";
-import { Shell } from "./components/Shell";
-import { Loading, Card, Icon } from "./components/ui";
-import { T } from "./lib/theme";
+import { useEffect, useState } from "react";
+import { Routes, Route, useLocation } from "react-router-dom";
+import { club as staticClub } from "./content/club.config";
+import { getClubConfig } from "./lib/loadClub";
+import { ClubContext } from "./components/ClubContext";
+import { registerServiceWorker } from "./lib/pwa";
+import type { ClubConfig, DesignVariant } from "./content/types";
 
-import { Dashboard } from "./screens/Dashboard";
-import { People } from "./screens/People";
-import { Roles } from "./screens/Roles";
-import { Rosters } from "./screens/Rosters";
-import { Communications } from "./screens/Communications";
-import { Reports } from "./screens/Reports";
-import { Compliance } from "./screens/Compliance";
-import { Billing } from "./screens/Billing";
-import { Opportunities } from "./screens/Opportunities";
-import { PublicSignup } from "./screens/PublicSignup";
-import { CheckIn } from "./screens/CheckIn";
-import { Settings } from "./screens/Settings";
-import { Login } from "./screens/Login";
-import { VolunteerView } from "./screens/VolunteerView";
-import { Stub } from "./screens/Stub";
+import { Header } from "./components/layout/Header";
+import { Footer } from "./components/layout/Footer";
+import { MobileTabBar } from "./components/layout/MobileTabBar";
+import { AnnouncementBar } from "./components/blocks/AnnouncementBar";
+import { AppPrompts } from "./components/pwa/AppPrompts";
 
-function NoticeScreen({ title, body, icon }: { title: string; body: string; icon: string }) {
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <Card pad={32} style={{ maxWidth: 460, textAlign: "center" }}>
-        <div style={{ width: 52, height: 52, borderRadius: 15, background: "#F4EEE2", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}><Icon n={icon} s={24} c={T.navy} /></div>
-        <h1 className="disp" style={{ fontSize: 24, margin: 0 }}>{title}</h1>
-        <p style={{ color: T.muted, fontSize: 14.5, marginTop: 10 }}>{body}</p>
-      </Card>
-    </div>
-  );
+import { Home } from "./pages/Home";
+import { About } from "./pages/About";
+import { Teams } from "./pages/Teams";
+import { Sport } from "./pages/Sport";
+import { Program } from "./pages/Program";
+import { Fixtures } from "./pages/Fixtures";
+import { News } from "./pages/News";
+import { NewsArticle } from "./pages/NewsArticle";
+import { Events } from "./pages/Events";
+import { EventDetail } from "./pages/EventDetail";
+import { Sponsors } from "./pages/Sponsors";
+import { Documents } from "./pages/Documents";
+import { Contact } from "./pages/Contact";
+import { Register } from "./pages/Register";
+import { NotFound } from "./pages/NotFound";
+import { AdminApp } from "./admin/AdminApp";
+import { SeoManager } from "./lib/seo";
+
+/** Scroll to top on every route change. */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
 }
 
-export function App() {
-  const { ready, configured, signedIn, clubId, viewer } = useApp();
+export default function App() {
+  // Static config renders instantly; live Supabase content swaps in when ready.
+  const [club, setClub] = useState<ClubConfig>(staticClub);
+  const [variant, setVariant] = useState<DesignVariant>(staticClub.variant);
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith("/admin");
 
-  // Public, unauthenticated pages (QR / NFC / shared link) — before any gate.
-  if (window.location.pathname.startsWith("/v/")) return <PublicSignup />;
-  if (window.location.pathname.startsWith("/checkin")) return <CheckIn />;
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
 
-  if (!ready) return <Loading label="Starting Volunteer Manager…" />;
-  if (!configured) return <NoticeScreen icon="cog" title="Connect Supabase" body="Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (see .env.example), then reload." />;
-  if (!signedIn) return <Login />;
-  if (!clubId) return <NoticeScreen icon="people" title="No club found" body="Your account isn't linked to a club yet. Add a club_users row mapping your user to a club." />;
+  useEffect(() => {
+    let active = true;
+    getClubConfig().then((c) => {
+      if (!active) return;
+      setClub(c);
+      setVariant(c.variant);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  // The volunteer/parent view is a single airy screen, not the manager shell.
-  if (viewer === "volunteer") return <VolunteerView />;
+  // Inject brand colours (the only runtime-themed tokens) from the live config.
+  useEffect(() => {
+    const root = document.documentElement;
+    const c = club.identity.colours;
+    root.style.setProperty("--club-ink", c.ink);
+    root.style.setProperty("--club-paper", c.paper);
+    root.style.setProperty("--club-accent", c.accent);
+    root.style.setProperty("--club-silver", c.silver);
+  }, [club]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-variant", variant);
+  }, [variant]);
+
+  // Admin runs as its own full-screen app, without the public site chrome.
+  if (isAdmin) {
+    return (
+      <ClubContext.Provider value={{ club, variant, setVariant }}>
+        <Routes>
+          <Route path="/admin/*" element={<AdminApp />} />
+        </Routes>
+      </ClubContext.Provider>
+    );
+  }
 
   return (
-    <Routes>
-      <Route element={<Shell />}>
-        <Route index element={<Dashboard />} />
-        <Route path="people" element={<People />} />
-        <Route path="roles" element={<Roles />} />
-        <Route path="opportunities" element={<Opportunities />} />
-        <Route path="rosters" element={<Rosters />} />
-        <Route path="game-day" element={<Stub title="Game Day Jobs" icon="whistle" sub="Sport-specific job templates (AFL / cricket / soccer) generate open shifts from a fixture." />} />
-        <Route path="events" element={<Stub title="Events" icon="spark" sub="Reuses the roster builder, scoped to club events." />} />
-        <Route path="compliance" element={<Compliance />} />
-        <Route path="onboarding" element={<Stub title="Onboarding & Training" icon="onboard" sub="Role-based onboarding stages; AI drafts each step." />} />
-        <Route path="comms" element={<Communications />} />
-        <Route path="recognition" element={<Stub title="Recognition" icon="award" sub="Suggests who to thank; drafts posts and certificates." />} />
-        <Route path="surveys" element={<Stub title="Surveys & Feedback" icon="survey" sub="Pulse surveys with AI summaries that become actions." />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="billing" element={<Billing />} />
-        <Route path="settings" element={<Settings />} />
-      </Route>
-    </Routes>
+    <ClubContext.Provider value={{ club, variant, setVariant }}>
+      <a href="#main" className="sw-skip">
+        Skip to content
+      </a>
+      <ScrollToTop />
+      <SeoManager />
+      <AnnouncementBar />
+      <Header />
+      <main id="main">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/football" element={<Sport sport="Football" />} />
+          <Route path="/netball" element={<Sport sport="Netball" />} />
+          <Route path="/program/:slug" element={<Program />} />
+          <Route path="/fixtures" element={<Fixtures />} />
+          <Route path="/news" element={<News />} />
+          <Route path="/news/:slug" element={<NewsArticle />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/events/:slug" element={<EventDetail />} />
+          <Route path="/sponsors" element={<Sponsors />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      <Footer />
+      <MobileTabBar />
+      <AppPrompts />
+    </ClubContext.Provider>
   );
 }
