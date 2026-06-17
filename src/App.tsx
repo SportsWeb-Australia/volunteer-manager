@@ -18,7 +18,11 @@ import { CheckIn } from "./screens/CheckIn";
 import { Settings } from "./screens/Settings";
 import { Login } from "./screens/Login";
 import { VolunteerView } from "./screens/VolunteerView";
-import { Stub } from "./screens/Stub";
+import { GameDay } from "./screens/GameDay";
+import { Events } from "./screens/Events";
+import { Onboarding } from "./screens/Onboarding";
+import { Recognition } from "./screens/Recognition";
+import { Surveys } from "./screens/Surveys";
 
 function NoticeScreen({ title, body, icon }: { title: string; body: string; icon: string }) {
   return (
@@ -55,13 +59,13 @@ export function App() {
         <Route path="roles" element={<Roles />} />
         <Route path="opportunities" element={<Opportunities />} />
         <Route path="rosters" element={<Rosters />} />
-        <Route path="game-day" element={<Stub title="Game Day Jobs" icon="whistle" sub="Sport-specific job templates (AFL / cricket / soccer) generate open shifts from a fixture." />} />
-        <Route path="events" element={<Stub title="Events" icon="spark" sub="Reuses the roster builder, scoped to club events." />} />
+        <Route path="game-day" element={<GameDay />} />
+        <Route path="events" element={<Events />} />
         <Route path="compliance" element={<Compliance />} />
-        <Route path="onboarding" element={<Stub title="Onboarding & Training" icon="onboard" sub="Role-based onboarding stages; AI drafts each step." />} />
+        <Route path="onboarding" element={<Onboarding />} />
         <Route path="comms" element={<Communications />} />
-        <Route path="recognition" element={<Stub title="Recognition" icon="award" sub="Suggests who to thank; drafts posts and certificates." />} />
-        <Route path="surveys" element={<Stub title="Surveys & Feedback" icon="survey" sub="Pulse surveys with AI summaries that become actions." />} />
+        <Route path="recognition" element={<Recognition />} />
+        <Route path="surveys" element={<Surveys />} />
         <Route path="reports" element={<Reports />} />
         <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
