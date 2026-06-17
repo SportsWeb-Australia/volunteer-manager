@@ -4,10 +4,19 @@
 
 export interface SendResult { ok: boolean; providerId?: string; error?: string }
 
-// --- SMS · Twilio ----------------------------------------------------------
-// Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
-//   TWILIO_FROM = a number (+61…) OR a Messaging Service SID (starts with "MG")
+// --- SMS — provider-agnostic --------------------------------------------------
+// SMS_PROVIDER selects the adapter (default "twilio"). Add an AU provider by
+// writing another adapter with the same (to, body, fromOverride) signature and
+// wiring it in here — no product logic changes.
 export async function sendSms(to: string, body: string, fromOverride?: string): Promise<SendResult> {
+  const provider = (Deno.env.get("SMS_PROVIDER") || "twilio").toLowerCase();
+  if (provider === "clicksend") return sendSmsClickSend(to, body, fromOverride);
+  return sendSmsTwilio(to, body, fromOverride);
+}
+
+// Twilio adapter. Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
+//   TWILIO_FROM = a number (+61…) OR a Messaging Service SID (starts with "MG")
+async function sendSmsTwilio(to: string, body: string, fromOverride?: string): Promise<SendResult> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const token = Deno.env.get("TWILIO_AUTH_TOKEN");
   // fromOverride = an approved club-branded sender ID; otherwise the registered
@@ -26,6 +35,26 @@ export async function sendSms(to: string, body: string, fromOverride?: string): 
   });
   const d = await res.json().catch(() => ({}));
   return res.ok ? { ok: true, providerId: d.sid } : { ok: false, error: d.message ?? `Twilio ${res.status}` };
+}
+
+// ClickSend adapter (AU). Env: CLICKSEND_USERNAME, CLICKSEND_API_KEY, CLICKSEND_FROM
+//   CLICKSEND_FROM = a registered alphanumeric sender ID or number.
+async function sendSmsClickSend(to: string, body: string, fromOverride?: string): Promise<SendResult> {
+  const user = Deno.env.get("CLICKSEND_USERNAME");
+  const key = Deno.env.get("CLICKSEND_API_KEY");
+  const from = fromOverride || Deno.env.get("CLICKSEND_FROM");
+  if (!user || !key) return { ok: false, error: "ClickSend env not set (CLICKSEND_USERNAME / CLICKSEND_API_KEY)" };
+
+  const res = await fetch("https://rest.clicksend.com/v3/sms/send", {
+    method: "POST",
+    headers: { Authorization: "Basic " + btoa(`${user}:${key}`), "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: [{ source: "volunteerone", from, to, body }] }),
+  });
+  const d = await res.json().catch(() => ({}));
+  const m = d?.data?.messages?.[0];
+  return res.ok && (m?.status === "SUCCESS" || m?.message_id)
+    ? { ok: true, providerId: m?.message_id }
+    : { ok: false, error: m?.status ?? d?.response_msg ?? `ClickSend ${res.status}` };
 }
 
 // --- Email · Zoho ZeptoMail (transactional Zoho family) --------------------

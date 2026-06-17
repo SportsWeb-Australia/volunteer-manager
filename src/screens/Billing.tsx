@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useApp } from "../context/AppContext";
 import { useEntitlement } from "../hooks/useEntitlement";
 import { Card, SectionHead, Pill, Icon, Btn, Loading } from "../components/ui";
 import { T } from "../lib/theme";
+
+const SMS_PACKS: { sms: number; price: number }[] = [
+  { sms: 100, price: 15 },
+  { sms: 300, price: 39 },
+  { sms: 1000, price: 99 },
+];
 
 interface Plan {
   id: string; key: string; name: string; blurb: string | null;
@@ -24,8 +31,10 @@ const HIGHLIGHTS: [string, string][] = [
 ];
 
 export function Billing() {
+  const { clubId } = useApp();
   const { plan: currentKey } = useEntitlement();
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [quota, setQuota] = useState<{ used: number; allowance: number; credits: number; trial: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,9 +44,15 @@ export function Billing() {
         .select("id,key,name,blurb,tier_rank,price_monthly,included_in_sportsweb_tiers,features")
         .is("club_id", null).eq("status", "active").order("tier_rank");
       if (!cancelled) { setPlans((data as Plan[]) ?? []); setLoading(false); }
+      if (clubId) {
+        const { data: q } = await supabase.rpc("vm_sms_quota", { p_club: clubId });
+        if (!cancelled && q && typeof (q as { allowance?: number }).allowance === "number") {
+          setQuota(q as { used: number; allowance: number; credits: number; trial: boolean });
+        }
+      }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [clubId]);
 
   if (loading) return <Loading />;
 
@@ -76,6 +91,27 @@ export function Billing() {
             </Card>
           );
         })}
+      </div>
+
+      <div style={{ marginTop: 30 }}>
+        <SectionHead eyebrow="Top up" title="SMS packs"
+          sub="Email and push are unlimited on every plan. SMS is metered — top up any time, and packs never expire." />
+        {quota && (
+          <Card pad={16} style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5 }}>This month: <b>{quota.used}</b> of <b>{quota.allowance}</b> SMS used
+              {quota.credits > 0 && <> · <b>{quota.credits}</b> credit{quota.credits === 1 ? "" : "s"} in reserve</>}</span>
+            {quota.trial && <Pill bg={T.brandSoft} fg={T.brandDeep}>Free trial</Pill>}
+          </Card>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14 }}>
+          {SMS_PACKS.map(p => (
+            <Card key={p.sms} pad={18}>
+              <div className="disp" style={{ fontSize: 24 }}>{p.sms.toLocaleString()} SMS</div>
+              <div style={{ margin: "4px 0 14px" }}><span className="disp" style={{ fontSize: 26, color: T.ink }}>${p.price}</span></div>
+              <Btn full icon="bolt" onClick={() => alert("SMS pack checkout wires to billing-sync in Phase C.")}>Buy pack</Btn>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );

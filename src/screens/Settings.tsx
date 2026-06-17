@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useApp } from "../context/AppContext";
-import { Card, SectionHead, Icon, Btn, Loading } from "../components/ui";
+import { Card, SectionHead, Icon, Btn, Loading, Pill, fieldInput } from "../components/ui";
 import { Qr } from "../components/Qr";
 import { T } from "../lib/theme";
+
+function SenderPill({ status }: { status: string }) {
+  const map: Record<string, [string, string, string]> = {
+    not_started: ["#EEF1F4", T.muted, "Not requested"],
+    pending: [T.amberSoft, T.amber, "Pending approval"],
+    approved: [T.greenSoft, T.green, "Approved"],
+    rejected: [T.redSoft, T.red, "Rejected"],
+  };
+  const [bg, fg, label] = map[status] ?? map.not_started;
+  return <Pill bg={bg} fg={fg}>{label}</Pill>;
+}
 
 interface Settings {
   require_approval_before_send: boolean;
@@ -42,6 +53,18 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [sender, setSender] = useState<{ id: string; status: string }>({ id: "", status: "not_started" });
+  const [savingSender, setSavingSender] = useState(false);
+
+  const requestSender = async () => {
+    if (!clubId) return;
+    const id = sender.id.trim().toUpperCase();
+    if (!id) return;
+    setSavingSender(true);
+    await supabase.from("volunteer_settings").update({ sms_sender_id: id, sms_sender_status: "pending" }).eq("club_id", clubId);
+    setSender(p => ({ ...p, id, status: "pending" }));
+    setSavingSender(false);
+  };
 
   useEffect(() => {
     if (!clubId) return;
@@ -59,6 +82,9 @@ export function Settings() {
         });
         setLoading(false);
       }
+      const { data: snd } = await supabase.from("volunteer_settings")
+        .select("sms_sender_id,sms_sender_status").eq("club_id", clubId).maybeSingle();
+      if (!cancelled && snd) setSender({ id: snd.sms_sender_id ?? "", status: snd.sms_sender_status ?? "not_started" });
     })();
     return () => { cancelled = true; };
   }, [clubId]);
@@ -104,10 +130,10 @@ export function Settings() {
             const on = s.check_in_method === val;
             return (
               <button key={val} onClick={() => update({ check_in_method: val })} style={{
-                flex: "1 1 110px", textAlign: "left", border: `1px solid ${on ? T.red : T.line}`, background: on ? T.redSoft : "#fff",
+                flex: "1 1 110px", textAlign: "left", border: `1px solid ${on ? T.brand : T.line}`, background: on ? T.brandSoft : "#fff",
                 borderRadius: 12, padding: "11px 13px", cursor: "pointer",
               }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: on ? T.redDeep : T.ink }}>{label}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: on ? T.brandDeep : T.ink }}>{label}</div>
                 <div style={{ fontSize: 11.5, color: T.muted, marginTop: 2 }}>{hint}</div>
               </button>
             );
@@ -130,6 +156,27 @@ export function Settings() {
             </div>
           </div>
         )}
+      </Card>
+
+      {/* SMS sender ID */}
+      <Card pad={18} style={{ marginTop: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <Icon n="chat" s={18} c={T.navy} /><b style={{ fontSize: 15 }}>SMS sender ID</b>
+        </div>
+        <p style={{ fontSize: 13, color: T.muted, margin: "0 0 14px" }}>
+          By default texts send from the VolunteerOne platform sender. You can request your own club sender ID (e.g. a short club name). In Australia sender IDs must be registered/approved — we handle that for you, and your messages fall back to the platform sender until it's approved.
+        </p>
+        {sender.status === "approved" ? (
+          <div style={{ fontSize: 13.5, display: "flex", alignItems: "center", gap: 10 }}>Sending as <b>{sender.id}</b> <SenderPill status={sender.status} /></div>
+        ) : (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input value={sender.id} onChange={e => setSender(p => ({ ...p, id: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11) }))}
+              placeholder="e.g. DOOKIEFC" style={{ ...fieldInput, maxWidth: 220 }} />
+            <Btn onClick={requestSender}>{savingSender ? "Submitting…" : "Request sender ID"}</Btn>
+            <SenderPill status={sender.status} />
+          </div>
+        )}
+        <p style={{ fontSize: 11.5, color: T.muted, marginTop: 10 }}>Max 11 characters · letters &amp; numbers, no spaces.</p>
       </Card>
     </div>
   );

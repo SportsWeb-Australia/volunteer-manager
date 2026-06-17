@@ -99,10 +99,13 @@ Deno.serve(async (req) => {
     const smsFrom = (smsCfg?.sms_sender_status === "approved" && smsCfg?.sms_sender_id)
       ? (smsCfg.sms_sender_id as string) : undefined; // else providers use the platform sender
     let smsRemaining = Number.POSITIVE_INFINITY;
+    let smsMonthly = 0, smsUsedBefore = 0, smsCredits = 0;
     if (channels.includes("sms")) {
       const { data: quota } = await db.rpc("vm_sms_quota", { p_club: club });
-      const rem = (quota as { remaining?: number } | null)?.remaining;
-      if (typeof rem === "number") smsRemaining = rem;
+      const q = quota as { remaining?: number; monthly?: number; used?: number; credits?: number } | null;
+      if (q && typeof q.remaining === "number") {
+        smsRemaining = q.remaining; smsMonthly = q.monthly ?? 0; smsUsedBefore = q.used ?? 0; smsCredits = q.credits ?? 0;
+      }
     }
     const SMS_UNIT_COST = 0.08; // rough AUD per SMS, for usage/cost reporting
 
@@ -152,6 +155,15 @@ Deno.serve(async (req) => {
       }).eq("id", dispatchId!);
       if (overQuota > 0) skipped.push(`sms: ${overQuota} not sent (allowance reached)`);
       results[ch] = { sent, failed, error: lastErr, over_allowance: overQuota || undefined };
+    }
+
+    // Draw down purchased SMS credits for any sends beyond the monthly bundle.
+    const smsSent = results["sms"]?.sent ?? 0;
+    const fromCredits = Math.max(0, smsSent - Math.max(0, smsMonthly - smsUsedBefore));
+    if (fromCredits > 0) {
+      await db.from("volunteer_settings").update({
+        sms_credit_balance: Math.max(0, smsCredits - fromCredits),
+      }).eq("club_id", club);
     }
 
     // roll the message status up

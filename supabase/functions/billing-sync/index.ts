@@ -26,12 +26,14 @@ const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status
 
 interface Body {
   club_id: string;
-  action?: "activate" | "cancel";       // default activate
-  plan_key?: string;                     // explicit tier (e.g. vm_club)
+  action?: "activate" | "cancel" | "add_sms_credits";  // default activate
+  plan_key?: string;                     // explicit tier (e.g. vm_full)
   sportsweb_tier?: string;               // OR resolve the plan from a SW1 tier
-  source?: "standalone" | "bundled_sportsweb" | "trial" | "manual";
+  source?: "standalone" | "bundled_sportsweb" | "trial" | "manual" | "checkout" | "comp";
   biller?: string;                       // zoho_billing | stripe | bundled | manual
   biller_ref?: string;                   // external subscription id (stored in settings.config)
+  sms_count?: number;                    // for add_sms_credits — SMS to add to the balance
+  amount?: number;                       // for add_sms_credits — AUD paid (audit)
 }
 
 Deno.serve(async (req) => {
@@ -48,6 +50,17 @@ Deno.serve(async (req) => {
     const action = b.action ?? "activate";
 
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    if (action === "add_sms_credits") {
+      const qty = Math.max(0, Math.floor(Number(b.sms_count ?? 0)));
+      if (!qty) return json(400, { error: "sms_count (>0) is required" });
+      const { data: cur } = await db.from("volunteer_settings").select("sms_credit_balance").eq("club_id", b.club_id).maybeSingle();
+      const balance = (cur?.sms_credit_balance ?? 0) + qty;
+      const { error: uErr } = await db.from("volunteer_settings").update({ sms_credit_balance: balance }).eq("club_id", b.club_id);
+      if (uErr) return json(500, { error: "could not add credits", detail: uErr.message });
+      await db.from("volunteer_sms_packs").insert({ club_id: b.club_id, sms_count: qty, amount_aud: b.amount ?? null, source: b.source ?? "manual" });
+      return json(200, { ok: true, club_id: b.club_id, sms_credit_balance: balance, added: qty });
+    }
 
     if (action === "cancel") {
       await db.from("modules").update({ enabled: false })

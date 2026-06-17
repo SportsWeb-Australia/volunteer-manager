@@ -81,11 +81,17 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
   `source:"trial"`; **sender identity** = platform default `TWILIO_FROM` with an
   optional approved club `sms_sender_id` (status not_started|pending|approved|rejected,
   falls back to platform). Communications screen shows the SMS/trial quota.
-- **Phase B (next):** SMS packs + overage (wire to billing-sync), club-branded
-  sender approval flow/UI, formal provider-adapter interface + an AU adapter
-  (ClickSend/MessageMedia/Kudosity). AU rule: alphanumeric senders need
-  registration from **1 Jul 2026** — register the platform sender; club senders are
-  a paid, approved add-on.
+- **Phase B DONE (code) — needs PATCH 4 (`supabase/patch-4-sms-packs.sql`):**
+  SMS credit packs (`volunteer_settings.sms_credit_balance` + `volunteer_sms_packs`
+  audit table); `vm_sms_quota()` now returns monthly+credits; dispatch-message
+  draws down credits for sends beyond the monthly bundle; billing-sync gains an
+  `add_sms_credits` action (your checkout/admin grants packs). Provider-agnostic
+  SMS layer: `providers.ts` `sendSms` dispatches via `SMS_PROVIDER` env
+  (twilio | clicksend — ClickSend adapter added; needs `CLICKSEND_USERNAME/API_KEY/FROM`).
+  Settings has a club-branded **sender ID request** flow (status not_started→pending→
+  approved→rejected; you approve by setting `sms_sender_status='approved'`). Billing
+  shows SMS packs + current usage. AU rule: alphanumeric senders need registration
+  from **1 Jul 2026** — register the platform sender; club senders are a paid add-on.
 - **Phase C:** enforce transactional-vs-marketing (`volunteer_messages.category`),
   marketing consent capture + STOP/opt-out handling.
 
