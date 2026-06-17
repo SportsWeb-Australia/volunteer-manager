@@ -8,12 +8,14 @@ import { UpgradePrompt } from "../components/Gate";
 import { T } from "../lib/theme";
 
 interface Template { id: string; name: string; body: string; subject: string | null; type: string | null; }
+interface Msg { id: string; title: string | null; subject: string | null; category: string; channels: string[] | null; status: string; sent_at: string | null; }
 type Stage = "Needs review" | "Approved" | "Sent";
 
 export function Communications() {
   const { clubId } = useApp();
   const { has } = useEntitlement();
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<string | null>(null);
   const [subject, setSubject] = useState("Volunteers needed this weekend");
@@ -39,9 +41,11 @@ export function Communications() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data } = await supabase.from("volunteer_message_templates")
-        .select("id,name,body,subject,type,club_id").or(`club_id.eq.${clubId},club_id.is.null`).order("name");
-      if (!cancelled) { setTemplates((data as Template[]) ?? []); setLoading(false); loadQuota(); }
+      const [{ data }, { data: msgs }] = await Promise.all([
+        supabase.from("volunteer_message_templates").select("id,name,body,subject,type,club_id").or(`club_id.eq.${clubId},club_id.is.null`).order("name"),
+        supabase.from("volunteer_messages").select("id,title,subject,category,channels,status,sent_at").eq("club_id", clubId).order("created_at", { ascending: false }).limit(8),
+      ]);
+      if (!cancelled) { setTemplates((data as Template[]) ?? []); setMessages((msgs as Msg[]) ?? []); setLoading(false); loadQuota(); }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,6 +143,27 @@ export function Communications() {
             <span style={{ marginLeft: "auto", fontSize: 11.5, color: T.muted }}>AI never sends on its own.</span>
           </div>
         </Card>
+      )}
+
+      {messages.length > 0 && (
+        <>
+          <div className="eyebrow" style={{ margin: "4px 0 12px" }}>Recent messages</div>
+          <Card pad={0} style={{ overflow: "hidden", marginBottom: 22 }}>
+            {messages.map((m, i) => (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: i ? `1px solid ${T.line}` : "none" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title || m.subject || "Message"}</div>
+                  <div style={{ fontSize: 11.5, color: T.muted, marginTop: 3, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    {(m.channels ?? []).map(c => <span key={c} style={{ textTransform: "uppercase", fontSize: 9.5, letterSpacing: ".06em", background: "#EEF1F4", color: T.muted, borderRadius: 5, padding: "1px 6px" }}>{c}</span>)}
+                    {m.category === "marketing" && <span style={{ color: T.brandDeep, fontWeight: 600 }}>· marketing</span>}
+                    {m.sent_at && <span>· sent {new Date(m.sent_at).toLocaleDateString()}</span>}
+                  </div>
+                </div>
+                <span style={{ fontSize: 10.5, fontWeight: 600, textTransform: "capitalize", color: m.status === "sent" ? T.green : T.muted, background: m.status === "sent" ? T.greenSoft : "#EEF1F4", borderRadius: 999, padding: "3px 9px" }}>{m.status.replace("_", " ")}</span>
+              </div>
+            ))}
+          </Card>
+        </>
       )}
 
       <div className="eyebrow" style={{ margin: "4px 0 12px" }}>Templates</div>

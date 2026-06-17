@@ -113,6 +113,18 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
   webhook for `checkout.session.completed`. TODO: subscription renewal/cancel events
   (invoice.paid / customer.subscription.deleted) not handled yet.
 
+## Demo
+- **`supabase/demo-seed.sql`** — re-runnable seed for a separate demo club
+  ("Riverside United FC", id `de300000-0000-4000-a000-000000000001`, plan vm_full,
+  not a trial). Populates every screen: 12 volunteers, roles, sign-ups+applications,
+  shifts+assignments(+check-ins), hours (Reports), compliance traffic-lights,
+  training, recognition, surveys, an AI suggestion, and **message history incl. 12
+  sent SMS this month** so SMS usage/quota look live (no real sends). Re-run = reset.
+  Demo login: create an auth user, map it to the demo club via the `club_users`
+  block at the bottom of the file. Communications now shows a "Recent messages" list.
+- Free **trial** is the separate path (billing-sync `source:"trial"`): a club's own
+  empty club, vm_full + 25-SMS cap, auto-expires.
+
 ## BACKLOG / next steps
 - **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`
   (register `VOLUNTEER1`/`SPORTSWEB` as the platform sender), `ZEPTOMAIL_TOKEN/FROM`,
