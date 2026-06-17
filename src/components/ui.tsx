@@ -37,8 +37,8 @@ export function Icon({ n, s = 20, c = "currentColor", sw = 1.7 }: { n: string; s
   );
 }
 
-export function Card({ children, pad = 18, style }: { children: ReactNode; pad?: number; style?: CSSProperties }) {
-  return <div style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: pad, ...style }}>{children}</div>;
+export function Card({ children, pad = 18, style, className, onClick }: { children: ReactNode; pad?: number; style?: CSSProperties; className?: string; onClick?: () => void }) {
+  return <div className={className} onClick={onClick} style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 18, padding: pad, ...style }}>{children}</div>;
 }
 
 export function Pill({ children, bg, fg, soft }: { children: ReactNode; bg: string; fg: string; soft?: boolean }) {

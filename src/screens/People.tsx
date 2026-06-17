@@ -19,8 +19,10 @@ export function People() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");
 
-  // add-volunteer modal
-  const [adding, setAdding] = useState(false);
+  // add/edit modal
+  const [open, setOpen] = useState(false);
+  const [editVolId, setEditVolId] = useState<string | null>(null);
+  const [editPersonId, setEditPersonId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
@@ -39,42 +41,65 @@ export function People() {
   useEffect(() => { if (clubId) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clubId]);
 
   const openAdd = () => {
+    setEditVolId(null); setEditPersonId(null);
     setFullName(""); setMobile(""); setEmail(""); setStatus("active"); setErr(null);
-    setAdding(true);
+    setOpen(true);
   };
 
-  const saveVolunteer = async () => {
+  const openEdit = (r: Volunteer) => {
+    setEditVolId(r.id); setEditPersonId(r.person?.id ?? null);
+    setFullName(r.person?.full_name ?? ""); setMobile(r.person?.mobile ?? ""); setEmail(r.person?.email ?? "");
+    setStatus(r.status); setErr(null);
+    setOpen(true);
+  };
+
+  const save = async () => {
     if (!clubId) return;
     const name = fullName.trim();
     if (!name) { setErr("Please enter a name."); return; }
     setSaving(true); setErr(null);
+    const parts = name.split(/\s+/);
+    const personFields = {
+      full_name: name,
+      first_name: parts[0],
+      last_name: parts.length > 1 ? parts.slice(1).join(" ") : null,
+      mobile: mobile.trim() || null,
+      email: email.trim() || null,
+    };
     try {
-      // 1. create the shared person record (volunteers hang off `people`)
-      const parts = name.split(/\s+/);
-      const { data: person, error: pErr } = await supabase
-        .from("people")
-        .insert({
-          club_id: clubId,
-          full_name: name,
-          first_name: parts[0],
-          last_name: parts.length > 1 ? parts.slice(1).join(" ") : null,
-          mobile: mobile.trim() || null,
-          email: email.trim() || null,
-        })
-        .select("id")
-        .single();
-      if (pErr) throw pErr;
-
-      // 2. link a volunteer record to that person
-      const { error: vErr } = await supabase
-        .from("volunteers")
-        .insert({ club_id: clubId, person_id: person!.id, status });
-      if (vErr) throw vErr;
-
-      setAdding(false);
+      if (editVolId && editPersonId) {
+        const { error: pErr } = await supabase.from("people").update(personFields).eq("id", editPersonId);
+        if (pErr) throw pErr;
+        const { error: vErr } = await supabase.from("volunteers").update({ status }).eq("id", editVolId);
+        if (vErr) throw vErr;
+      } else {
+        const { data: person, error: pErr } = await supabase.from("people")
+          .insert({ club_id: clubId, ...personFields }).select("id").single();
+        if (pErr) throw pErr;
+        const { error: vErr } = await supabase.from("volunteers")
+          .insert({ club_id: clubId, person_id: person!.id, status });
+        if (vErr) throw vErr;
+      }
+      setOpen(false);
       await load();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Could not add volunteer.");
+      setErr(e instanceof Error ? e.message : "Could not save volunteer.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!editVolId) return;
+    if (!confirm("Remove this person as a volunteer? Their People Hub contact stays in the club directory.")) return;
+    setSaving(true); setErr(null);
+    try {
+      const { error } = await supabase.from("volunteers").delete().eq("id", editVolId);
+      if (error) throw error;
+      setOpen(false);
+      await load();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Could not remove volunteer.");
     } finally {
       setSaving(false);
     }
@@ -112,7 +137,7 @@ export function People() {
               const name = r.person?.full_name ?? "Unknown";
               const roles = (r.profile?.preferred_roles ?? []).join(", ");
               return (
-                <div key={r.id} className="row-hover" style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 16px", borderTop: i ? `1px solid ${T.line}` : "none", cursor: "pointer" }}>
+                <div key={r.id} className="row-hover" onClick={() => openEdit(r)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 16px", borderTop: i ? `1px solid ${T.line}` : "none", cursor: "pointer" }}>
                   <Avatar name={name} color={ci(name)} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14.5 }}>{name}</div>
@@ -125,8 +150,8 @@ export function People() {
           </Card>
         )}
 
-      {adding && (
-        <Modal title="Add volunteer" busy={saving} onClose={() => setAdding(false)}>
+      {open && (
+        <Modal title={editVolId ? "Edit volunteer" : "Add volunteer"} busy={saving} onClose={() => setOpen(false)}>
           <Field label="Full name *">
             <input autoFocus value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Jordan Smith" style={fieldInput} />
           </Field>
@@ -144,9 +169,12 @@ export function People() {
 
           {err && <FormError>{err}</FormError>}
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-            <Btn kind="ghost" onClick={() => !saving && setAdding(false)}>Cancel</Btn>
-            <Btn onClick={saveVolunteer}>{saving ? "Saving…" : "Add volunteer"}</Btn>
+          <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+            <div>{editVolId && <Btn kind="ghost" onClick={remove}>Remove</Btn>}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn kind="ghost" onClick={() => !saving && setOpen(false)}>Cancel</Btn>
+              <Btn onClick={save}>{saving ? "Saving…" : editVolId ? "Save changes" : "Add volunteer"}</Btn>
+            </div>
           </div>
         </Modal>
       )}

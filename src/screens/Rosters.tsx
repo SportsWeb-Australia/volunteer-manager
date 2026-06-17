@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useApp } from "../context/AppContext";
 import { buildRoster, approveRoster, type RosterProposal } from "../lib/api";
 import type { Shift } from "../lib/types";
-import { Card, SectionHead, Pill, Icon, Loading, EmptyState, Btn, Avatar, ReviewChip } from "../components/ui";
+import { Card, SectionHead, Pill, Icon, Loading, EmptyState, Btn, Avatar, ReviewChip, Modal, Field, FormError, fieldInput } from "../components/ui";
 import { Gate } from "../components/Gate";
 import { Qr } from "../components/Qr";
 import { T } from "../lib/theme";
@@ -99,6 +99,48 @@ export function Rosters() {
   const [qrFor, setQrFor] = useState<string | null>(null);
   const origin = window.location.origin;
 
+  // new-shift modal
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [location, setLocation] = useState("");
+  const [needed, setNeeded] = useState("1");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const openAdd = () => {
+    setTitle(""); setDate(""); setStart(""); setEnd(""); setLocation(""); setNeeded("1"); setErr(null);
+    setAdding(true);
+  };
+
+  const saveShift = async () => {
+    if (!clubId) return;
+    const t = title.trim();
+    if (!t) { setErr("Please enter a shift title."); return; }
+    setSaving(true); setErr(null);
+    try {
+      const { error } = await supabase.from("volunteer_shifts").insert({
+        club_id: clubId, title: t,
+        shift_date: date || null,
+        start_time: start || null,
+        end_time: end || null,
+        location: location.trim() || null,
+        volunteers_needed: Math.max(1, parseInt(needed, 10) || 1),
+        status: "open",
+        check_in_token: crypto.randomUUID(),
+      });
+      if (error) throw error;
+      setAdding(false);
+      setTick(n => n + 1);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Could not create shift.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (!clubId) return;
     let cancelled = false;
@@ -115,11 +157,13 @@ export function Rosters() {
   return (
     <div className="fade">
       <SectionHead eyebrow="Rosters & shifts" title="Rosters & shifts"
-        sub="Fill shifts by hand, or let the AI build a fair draft and explain every pick." />
+        sub="Fill shifts by hand, or let the AI build a fair draft and explain every pick."
+        right={<Btn icon="cal" onClick={openAdd}>New shift</Btn>} />
       <Gate feature="ai_roster_builder"><BuildMyRoster onCommitted={() => setTick(t => t + 1)} /></Gate>
 
       {loading ? <Loading />
-        : shifts.length === 0 ? <EmptyState icon="cal" title="No shifts yet" sub="Generate game-day jobs from a fixture, or add shifts to a roster." />
+        : shifts.length === 0 ? <EmptyState icon="cal" title="No shifts yet" sub="Add a shift by hand to get started — each one gets its own check-in QR."
+            action={<Btn icon="cal" onClick={openAdd}>New shift</Btn>} />
         : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(250px,1fr))", gap: 12 }}>
             {shifts.map(s => {
@@ -151,6 +195,34 @@ export function Rosters() {
             })}
           </div>
         )}
+
+      {adding && (
+        <Modal title="New shift" busy={saving} onClose={() => setAdding(false)}>
+          <Field label="Shift title *">
+            <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Saturday BBQ" style={fieldInput} />
+          </Field>
+          <Field label="Date">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={fieldInput} />
+          </Field>
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}><Field label="Start time"><input type="time" value={start} onChange={e => setStart(e.target.value)} style={fieldInput} /></Field></div>
+            <div style={{ flex: 1 }}><Field label="End time"><input type="time" value={end} onChange={e => setEnd(e.target.value)} style={fieldInput} /></Field></div>
+          </div>
+          <Field label="Location">
+            <input value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Oval gate" style={fieldInput} />
+          </Field>
+          <Field label="Volunteers needed">
+            <input type="number" min={1} value={needed} onChange={e => setNeeded(e.target.value)} style={fieldInput} />
+          </Field>
+
+          {err && <FormError>{err}</FormError>}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+            <Btn kind="ghost" onClick={() => !saving && setAdding(false)}>Cancel</Btn>
+            <Btn onClick={saveShift}>{saving ? "Saving…" : "Create shift"}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
