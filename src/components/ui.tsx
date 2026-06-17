@@ -69,7 +69,7 @@ type BtnKind = "primary" | "dark" | "ghost" | "soft" | "green";
 export function Btn({ children, kind = "primary", sm, onClick, icon, full }: { children: ReactNode; kind?: BtnKind; sm?: boolean; onClick?: () => void; icon?: string; full?: boolean }) {
   const base: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, border: "none", borderRadius: 11, fontWeight: 600, fontSize: sm ? 12.5 : 14, padding: sm ? "7px 12px" : "10px 16px", width: full ? "100%" : "auto", cursor: "pointer", fontFamily: F.body };
   const k: Record<BtnKind, CSSProperties> = {
-    primary: { background: T.red, color: "#fff" },
+    primary: { background: T.brand, color: "#fff" },
     dark: { background: T.navy, color: "#fff" },
     ghost: { background: "transparent", color: T.ink, border: `1px solid ${T.line}` },
     soft: { background: "#F1ECE0", color: T.ink },
@@ -108,7 +108,7 @@ export function SectionHead({ eyebrow, title, sub, right }: { eyebrow?: string; 
 
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return <div style={{ padding: 28, color: T.muted, fontSize: 14, display: "flex", gap: 9, alignItems: "center" }}>
-    <span style={{ width: 12, height: 12, borderRadius: 99, background: T.red, display: "inline-block" }} />{label}
+    <span style={{ width: 12, height: 12, borderRadius: 99, background: T.brand, display: "inline-block" }} />{label}
   </div>;
 }
 

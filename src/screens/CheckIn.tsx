@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Card, Btn, Icon } from "../components/ui";
+import { VOneLogo } from "../components/Logo";
 import { T } from "../lib/theme";
 
 export function CheckIn() {
@@ -24,9 +25,8 @@ export function CheckIn() {
     <div style={{ minHeight: "100vh", background: T.paper, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 18px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap');`}</style>
       <div style={{ width: "100%", maxWidth: 420 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="bolt" c="#fff" s={18} /></div>
-          <span className="disp" style={{ fontSize: 18 }}>SHIFT CHECK-IN</span>
+        <div style={{ display: "flex", marginBottom: 18 }}>
+          <VOneLogo mark={34} word={19} />
         </div>
 
         {done ? (

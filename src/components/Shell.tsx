@@ -4,6 +4,7 @@ import { T, F } from "../lib/theme";
 import { Icon } from "./ui";
 import { useApp } from "../context/AppContext";
 import { useEntitlement } from "../hooks/useEntitlement";
+import { VOneLogo } from "./Logo";
 
 const NAV: [string, string, string][] = [
   ["Dashboard", "/", "grid"],
@@ -24,15 +25,7 @@ const NAV: [string, string, string][] = [
 ];
 
 function Brand({ mini }: { mini?: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ width: 34, height: 34, borderRadius: 9, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="bolt" c="#fff" s={20} /></div>
-      <div style={{ lineHeight: 1 }}>
-        <div className="disp" style={{ fontSize: 18, color: "#fff" }}>SPORTSWEB ONE</div>
-        {!mini && <div className="mono" style={{ fontSize: 9.5, color: T.mutedNavy, letterSpacing: ".14em", marginTop: 3 }}>VOLUNTEER MANAGER</div>}
-      </div>
-    </div>
-  );
+  return <VOneLogo light mark={mini ? 30 : 36} word={mini ? 17 : 19} tagline={!mini} />;
 }
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
@@ -43,7 +36,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           style={({ isActive }) => ({
             display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 10,
             textDecoration: "none", fontSize: 13.5, fontWeight: isActive ? 600 : 500,
-            background: isActive ? T.red : "transparent", color: isActive ? "#fff" : T.mutedNavy,
+            background: isActive ? T.brand : "transparent", color: isActive ? "#fff" : T.mutedNavy,
           })}>
           {({ isActive }) => <><Icon n={icon} s={18} c={isActive ? "#fff" : T.mutedNavy} />{label}</>}
         </NavLink>
@@ -59,7 +52,7 @@ function ViewerSwitch() {
       <div className="mono" style={{ fontSize: 9.5, letterSpacing: ".14em", color: T.mutedNavy, marginBottom: 9 }}>VIEWING AS</div>
       <div style={{ display: "flex", background: T.navy2, borderRadius: 10, padding: 3 }}>
         {(["manager", "volunteer"] as const).map(k => (
-          <button key={k} onClick={() => setViewer(k)} style={{ flex: 1, border: "none", borderRadius: 8, padding: "7px 6px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", background: viewer === k ? T.red : "transparent", color: viewer === k ? "#fff" : T.mutedNavy }}>
+          <button key={k} onClick={() => setViewer(k)} style={{ flex: 1, border: "none", borderRadius: 8, padding: "7px 6px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", background: viewer === k ? T.brand : "transparent", color: viewer === k ? "#fff" : T.mutedNavy }}>
             {k === "manager" ? "Manager" : "Volunteer"}
           </button>
         ))}

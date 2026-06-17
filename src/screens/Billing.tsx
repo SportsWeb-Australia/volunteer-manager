@@ -50,8 +50,8 @@ export function Billing() {
           const current = p.key === currentKey;
           const flags = p.features?.flags ?? {};
           return (
-            <Card key={p.id} pad={20} style={{ border: current ? `2px solid ${T.red}` : `1px solid ${T.line}`, position: "relative" }}>
-              {current && <span style={{ position: "absolute", top: 14, right: 14 }}><Pill bg={T.redSoft} fg={T.red}>Your plan</Pill></span>}
+            <Card key={p.id} pad={20} style={{ border: current ? `2px solid ${T.brand}` : `1px solid ${T.line}`, position: "relative" }}>
+              {current && <span style={{ position: "absolute", top: 14, right: 14 }}><Pill bg={T.brandSoft} fg={T.brandDeep}>Your plan</Pill></span>}
               <div className="disp" style={{ fontSize: 22 }}>{p.name.replace("Volunteer Manager — ", "")}</div>
               <div style={{ margin: "6px 0 12px" }}>
                 <span className="disp" style={{ fontSize: 30, color: T.ink }}>{p.price_monthly ? `$${p.price_monthly}` : "Free"}</span>

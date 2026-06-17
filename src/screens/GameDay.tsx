@@ -56,7 +56,7 @@ export function GameDay() {
           {JOBS.map(j => {
             const on = picked.has(j);
             return (
-              <button key={j} onClick={() => toggle(j)} style={{ border: `1px solid ${on ? T.red : T.line}`, background: on ? T.red : "#fff", color: on ? "#fff" : T.ink, padding: "8px 13px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{j}</button>
+              <button key={j} onClick={() => toggle(j)} style={{ border: `1px solid ${on ? T.brand : T.line}`, background: on ? T.brand : "#fff", color: on ? "#fff" : T.ink, padding: "8px 13px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{j}</button>
             );
           })}
         </div>

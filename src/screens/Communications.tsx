@@ -77,9 +77,9 @@ export function Communications() {
         right={<Btn icon="spark" onClick={() => newDraft()}>New AI draft</Btn>} />
 
       {draft != null && (
-        <Card pad={18} style={{ marginBottom: 20, borderColor: "#E4C9C7" }}>
+        <Card pad={18} style={{ marginBottom: 20, borderColor: T.brandSoft }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon n="spark" s={18} c={T.red} /><b style={{ fontSize: 15 }}>AI draft · volunteer call-out</b></div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}><Icon n="spark" s={18} c={T.brand} /><b style={{ fontSize: 15 }}>AI draft · volunteer call-out</b></div>
             <ReviewChip state={stage === "Sent" ? "Approved" : stage} />
           </div>
           <input value={subject} onChange={e => setSubject(e.target.value)} disabled={stage !== "Needs review"}

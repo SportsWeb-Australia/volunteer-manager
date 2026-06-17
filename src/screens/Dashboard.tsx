@@ -57,9 +57,9 @@ export function Dashboard() {
       <SectionHead eyebrow={clubName ?? "Your club"} title="Dashboard"
         sub="The system prepares everything below — you just review and approve. Nothing is sent without you." />
 
-      <Card pad={0} style={{ overflow: "hidden", marginBottom: 22, borderColor: "#E4C9C7" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", background: "linear-gradient(90deg,#FBE9E7,#FBF3E7)", borderBottom: `1px solid ${T.line}` }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="spark" c="#fff" s={18} /></div>
+      <Card pad={0} style={{ overflow: "hidden", marginBottom: 22, borderColor: T.brandSoft }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", background: "linear-gradient(90deg,#E0F5F1,#EAF6F4)", borderBottom: `1px solid ${T.line}` }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: T.brand, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="spark" c="#fff" s={18} /></div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>Suggested actions</div>
             <div style={{ fontSize: 12, color: T.muted }}>Prepared by SportsWeb AI · approve before anything happens</div>

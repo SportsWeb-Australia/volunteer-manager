@@ -42,10 +42,10 @@ function BuildMyRoster({ onCommitted }: { onCommitted: () => void }) {
   };
 
   return (
-    <Card pad={18} style={{ marginBottom: 18, borderColor: "#E4C9C7" }}>
+    <Card pad={18} style={{ marginBottom: 18, borderColor: T.brandSoft }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Icon n="spark" s={18} c={T.red} /><b style={{ fontSize: 15 }}>Build my roster</b>
+          <Icon n="spark" s={18} c={T.brand} /><b style={{ fontSize: 15 }}>Build my roster</b>
         </div>
         {!proposal && <Btn icon="bolt" onClick={run}>{busy ? "Building…" : "Generate draft"}</Btn>}
       </div>

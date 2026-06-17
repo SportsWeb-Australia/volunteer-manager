@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Card, Btn, Icon } from "../components/ui";
+import { VOneLogo } from "../components/Logo";
 import { T } from "../lib/theme";
 
 export function Login() {
@@ -24,9 +25,8 @@ export function Login() {
     <div style={{ minHeight: "100vh", background: T.paper, display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 18px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap');`}</style>
       <div style={{ width: "100%", maxWidth: 400 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, justifyContent: "center" }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="people" c="#fff" s={19} /></div>
-          <span className="disp" style={{ fontSize: 19 }}>VOLUNTEER MANAGER</span>
+        <div style={{ display: "flex", marginBottom: 18, justifyContent: "center" }}>
+          <VOneLogo mark={40} word={22} />
         </div>
 
         {sent ? (

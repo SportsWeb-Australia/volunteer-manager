@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { Card, Btn, Icon, Loading } from "../components/ui";
+import { VOneLogo } from "../components/Logo";
 import { T } from "../lib/theme";
 
 interface OppInfo { title: string; description: string | null; location: string | null; starts_at: string | null; }
@@ -42,9 +43,8 @@ export function PublicSignup() {
     <div style={{ minHeight: "100vh", background: T.paper, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 18px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap');`}</style>
       <div style={{ width: "100%", maxWidth: 440 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon n="bolt" c="#fff" s={18} /></div>
-          <span className="disp" style={{ fontSize: 18 }}>SPORTSWEB ONE</span>
+        <div style={{ display: "flex", marginBottom: 18 }}>
+          <VOneLogo mark={34} word={19} />
         </div>
 
         {loading ? <Loading label="Loading…" />

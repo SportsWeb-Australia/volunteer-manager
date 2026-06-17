@@ -43,7 +43,7 @@ export function App() {
   if (window.location.pathname.startsWith("/v/")) return <PublicSignup />;
   if (window.location.pathname.startsWith("/checkin")) return <CheckIn />;
 
-  if (!ready) return <Loading label="Starting Volunteer Manager…" />;
+  if (!ready) return <Loading label="Starting VolunteerOne…" />;
   if (!configured) return <NoticeScreen icon="cog" title="Connect Supabase" body="Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (see .env.example), then reload." />;
   if (!signedIn) return <Login />;
   if (!clubId) return <NoticeScreen icon="people" title="No club found" body="Your account isn't linked to a club yet. Add a club_users row mapping your user to a club." />;
