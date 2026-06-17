@@ -104,8 +104,14 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
   **Checkout scaffold (provider-agnostic):** `create-checkout` (Stripe adapter for
   one-time SMS packs; inert until `PAYMENT_PROVIDER=stripe` + `STRIPE_SECRET_KEY`) →
   `payment-webhook` (?key-guarded; grants the pack). Billing buttons call it with a
-  graceful "not configured" fallback. **OPEN: confirm payment provider (Stripe vs
-  Zoho Billing).** Stripe webhook needs real signature verification before prod.
+  graceful "not configured" fallback. **Provider = Stripe (decided).** create-checkout
+  does one-time SMS packs (mode=payment) + monthly plan subscriptions (mode=subscription
+  with price_data); payment-webhook verifies the Stripe-Signature (HMAC-SHA256 via
+  STRIPE_WEBHOOK_SECRET, ?key fallback) and on checkout.session.completed grants the
+  pack or activates the plan (clears trial). **To go live:** set `PAYMENT_PROVIDER=stripe`,
+  `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`; add the payment-webhook URL as a Stripe
+  webhook for `checkout.session.completed`. TODO: subscription renewal/cancel events
+  (invoice.paid / customer.subscription.deleted) not handled yet.
 
 ## BACKLOG / next steps
 - **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`
