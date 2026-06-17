@@ -23,6 +23,15 @@ export function Communications() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [quota, setQuota] = useState<{ used: number; allowance: number; remaining: number; trial: boolean } | null>(null);
+
+  const loadQuota = async () => {
+    if (!clubId) return;
+    const { data } = await supabase.rpc("vm_sms_quota", { p_club: clubId });
+    if (data && typeof (data as { allowance?: number }).allowance === "number") {
+      setQuota(data as { used: number; allowance: number; remaining: number; trial: boolean });
+    }
+  };
 
   useEffect(() => {
     if (!clubId) return;
@@ -31,9 +40,10 @@ export function Communications() {
       setLoading(true);
       const { data } = await supabase.from("volunteer_message_templates")
         .select("id,name,body,subject,type,club_id").or(`club_id.eq.${clubId},club_id.is.null`).order("name");
-      if (!cancelled) { setTemplates((data as Template[]) ?? []); setLoading(false); }
+      if (!cancelled) { setTemplates((data as Template[]) ?? []); setLoading(false); loadQuota(); }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId]);
 
   const newDraft = (body?: string) => {
@@ -64,6 +74,7 @@ export function Communications() {
       const sent = Object.values(r.channels).reduce((s, c) => s + c.sent, 0);
       setResult(`${r.status} — ${sent} sent across ${Object.keys(r.channels).join(", ") || "no channels"}${r.skipped.length ? ` · skipped: ${r.skipped.join(", ")}` : ""}`);
       setStage("Sent");
+      loadQuota();
     } catch (e: any) { setErr(e?.message ?? "Send failed."); }
     finally { setBusy(false); }
   };
@@ -75,6 +86,17 @@ export function Communications() {
       <SectionHead eyebrow="Plain, friendly club language" title="Communications"
         sub="AI drafts every message; you read and approve before anything goes out. Sending runs through Twilio / Zoho / WebPushr — and never on its own."
         right={<Btn icon="spark" onClick={() => newDraft()}>New AI draft</Btn>} />
+
+      {quota && (quota.trial || quota.allowance > 0) && (
+        <Card pad={13} style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: quota.trial ? T.brandSoft : T.card, borderColor: quota.trial ? "#A9E6DD" : T.line }}>
+          <div style={{ fontSize: 13 }}>
+            {quota.trial && <b style={{ color: T.brandDeep }}>Free trial · </b>}
+            <b>{quota.used}</b> of <b>{quota.allowance}</b> SMS used this month
+            {quota.remaining === 0 && <span style={{ color: T.red, fontWeight: 600 }}> · allowance reached</span>}
+          </div>
+          <span style={{ fontSize: 11.5, color: T.muted }}>Email &amp; push are unlimited</span>
+        </Card>
+      )}
 
       {draft != null && (
         <Card pad={18} style={{ marginBottom: 20, borderColor: T.brandSoft }}>

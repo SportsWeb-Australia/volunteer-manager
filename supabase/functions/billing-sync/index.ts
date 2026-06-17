@@ -78,8 +78,14 @@ Deno.serve(async (req) => {
     if (b.source) cfg.source = b.source;
     if (b.biller) cfg.biller = b.biller;
     if (b.biller_ref) cfg.biller_ref = b.biller_ref;
+    const settingsRow: Record<string, unknown> = { club_id: b.club_id, plan_key: planKey, config: cfg };
+    // Free trial: full features, capped SMS, auto-expires in 30 days.
+    if (b.source === "trial") {
+      settingsRow.trial_ends_at = new Date(Date.now() + 30 * 864e5).toISOString();
+      settingsRow.trial_sms_allowance = 25;
+    }
     const { error: setErr } = await db.from("volunteer_settings")
-      .upsert({ club_id: b.club_id, plan_key: planKey, config: cfg }, { onConflict: "club_id" });
+      .upsert(settingsRow, { onConflict: "club_id" });
     if (setErr) return json(500, { error: "could not set plan", detail: setErr.message });
 
     return json(200, { ok: true, club_id: b.club_id, status: "active", plan_key: planKey });

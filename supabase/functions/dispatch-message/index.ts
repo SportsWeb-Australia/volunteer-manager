@@ -92,14 +92,28 @@ Deno.serve(async (req) => {
     vq = aud.volunteer_ids?.length ? vq.in("id", aud.volunteer_ids) : vq.in("status", aud.statuses?.length ? aud.statuses : ["active"]);
     const { data: vols } = await vq;
 
-    const results: Record<string, { sent: number; failed: number; provider_ref?: string; error?: string }> = {};
+    // SMS sender identity + allowance (Phase A metering). Fail-open if PATCH 3
+    // isn't applied yet, so existing behaviour is never blocked by a missing meter.
+    const { data: smsCfg } = await db.from("volunteer_settings")
+      .select("sms_sender_id,sms_sender_status").eq("club_id", club).maybeSingle();
+    const smsFrom = (smsCfg?.sms_sender_status === "approved" && smsCfg?.sms_sender_id)
+      ? (smsCfg.sms_sender_id as string) : undefined; // else providers use the platform sender
+    let smsRemaining = Number.POSITIVE_INFINITY;
+    if (channels.includes("sms")) {
+      const { data: quota } = await db.rpc("vm_sms_quota", { p_club: club });
+      const rem = (quota as { remaining?: number } | null)?.remaining;
+      if (typeof rem === "number") smsRemaining = rem;
+    }
+    const SMS_UNIT_COST = 0.08; // rough AUD per SMS, for usage/cost reporting
+
+    const results: Record<string, { sent: number; failed: number; provider_ref?: string; error?: string; over_allowance?: number }> = {};
 
     for (const ch of channels) {
       const provider = ch === "sms" ? "twilio" : ch === "email" ? "zeptomail" : "webpushr";
       const { data: dispatch } = await db.from("volunteer_message_dispatches")
         .insert({ club_id: club, message_id, channel: ch, provider, status: "sending" }).select("id").single();
       const dispatchId = dispatch?.id as string | undefined;
-      let sent = 0, failed = 0, lastErr: string | undefined;
+      let sent = 0, failed = 0, overQuota = 0, lastErr: string | undefined;
 
       if (ch === "push") {
         const r: SendResult = await sendPush(msg.title ?? msg.subject ?? "Club update", msg.body ?? "");
@@ -117,15 +131,17 @@ Deno.serve(async (req) => {
         const who = nameOf(person);
         const addr = ch === "sms" ? (person?.mobile as string) : (person?.email as string);
         if (!addr) continue;
+        if (ch === "sms" && sent >= smsRemaining) { overQuota++; continue; } // SMS allowance reached
 
         const r: SendResult = ch === "sms"
-          ? await sendSms(addr, fill(msg.body ?? "", who))
+          ? await sendSms(addr, fill(msg.body ?? "", who), smsFrom)
           : await sendEmail(addr, msg.subject ?? msg.title ?? "Club update", htmlBody(fill(msg.body ?? "", who)), who);
         r.ok ? sent++ : (failed++, lastErr = r.error);
 
         await db.from("volunteer_message_recipients").insert({
           club_id: club, message_id, dispatch_id: dispatchId, volunteer_id: v.id, person_id: v.person_id,
           channel: ch, address: addr, provider_message_id: r.providerId, error: r.error,
+          cost_estimate: ch === "sms" && r.ok ? SMS_UNIT_COST : null,
           status: r.ok ? "sent" : "failed", sent_at: r.ok ? new Date().toISOString() : null,
         });
       }
@@ -134,7 +150,8 @@ Deno.serve(async (req) => {
         status: failed && !sent ? "failed" : "sent", sent_at: new Date().toISOString(),
         error: lastErr, stats: { sent, failed },
       }).eq("id", dispatchId!);
-      results[ch] = { sent, failed, error: lastErr };
+      if (overQuota > 0) skipped.push(`sms: ${overQuota} not sent (allowance reached)`);
+      results[ch] = { sent, failed, error: lastErr, over_allowance: overQuota || undefined };
     }
 
     // roll the message status up

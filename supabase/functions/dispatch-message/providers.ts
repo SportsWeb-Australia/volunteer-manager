@@ -7,10 +7,12 @@ export interface SendResult { ok: boolean; providerId?: string; error?: string }
 // --- SMS · Twilio ----------------------------------------------------------
 // Env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
 //   TWILIO_FROM = a number (+61…) OR a Messaging Service SID (starts with "MG")
-export async function sendSms(to: string, body: string): Promise<SendResult> {
+export async function sendSms(to: string, body: string, fromOverride?: string): Promise<SendResult> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const token = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const from = Deno.env.get("TWILIO_FROM");
+  // fromOverride = an approved club-branded sender ID; otherwise the registered
+  // platform sender (TWILIO_FROM, e.g. "VOLUNTEER1").
+  const from = fromOverride || Deno.env.get("TWILIO_FROM");
   if (!sid || !token || !from) return { ok: false, error: "Twilio env not set (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM)" };
 
   const form = new URLSearchParams({ To: to, Body: body });
