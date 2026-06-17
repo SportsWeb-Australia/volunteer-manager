@@ -23,6 +23,8 @@ The module is branded **VolunteerOne**, "Powered by SportsWeb One".
 - **DB:** schema + addendum + seed RUN. **PATCH 1 RUN** (grants/RLS to
   `authenticated`). **PATCH 2 RUN** (`supabase/patch-2-service-role-grants.sql` —
   grants `service_role` access so Edge Functions work; see gotchas).
+  **PATCH 3** (`supabase/patch-3-sms-metering.sql`) — SMS metering + trial +
+  sender identity + free push/email + `vm_sms_quota()` RPC. **RUN THIS.**
 - **Edge Functions: ALL 7 DEPLOYED & WORKING** (build-roster, approve-roster,
   dispatch-message, billing-sync, public-signup, shift-checkin, message-webhook).
   public-signup / shift-checkin / message-webhook deployed `--no-verify-jwt`.
@@ -72,10 +74,26 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
 - **Compliance:** "Send expiry reminders" drafts a `volunteer_messages` row.
 - **Reports:** CSV download + Export PDF (browser print).
 
+## Comms / monetisation (centralised model — clubs never bring their own provider)
+- **Phase A DONE (code):** email + push free in all tiers; **SMS metered** via
+  `vm_sms_quota()` + enforced in dispatch-message; **trial** = `vm_full` +
+  `trial_ends_at` + `trial_sms_allowance` (default 25), provisioned by billing-sync
+  `source:"trial"`; **sender identity** = platform default `TWILIO_FROM` with an
+  optional approved club `sms_sender_id` (status not_started|pending|approved|rejected,
+  falls back to platform). Communications screen shows the SMS/trial quota.
+- **Phase B (next):** SMS packs + overage (wire to billing-sync), club-branded
+  sender approval flow/UI, formal provider-adapter interface + an AU adapter
+  (ClickSend/MessageMedia/Kudosity). AU rule: alphanumeric senders need
+  registration from **1 Jul 2026** — register the platform sender; club senders are
+  a paid, approved add-on.
+- **Phase C:** enforce transactional-vs-marketing (`volunteer_messages.category`),
+  marketing consent capture + STOP/opt-out handling.
+
 ## BACKLOG / next steps
-- **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`,
-  `ZEPTOMAIL_TOKEN/FROM`, `WEBPUSHR_KEY/AUTH_TOKEN`, and `VM_WEBHOOK_SECRET`
-  (billing-sync + message-webhook). `supabase secrets set …`.
+- **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`
+  (register `VOLUNTEER1`/`SPORTSWEB` as the platform sender), `ZEPTOMAIL_TOKEN/FROM`,
+  `WEBPUSHR_KEY/AUTH_TOKEN`, and `VM_WEBHOOK_SECRET` (billing-sync + message-webhook).
+  `supabase secrets set …`.
 - **Events insert caveat:** `events` is shared with the club-website product and
   has its own RLS — creating an event from here may hit a permission error.
   Verify the `authenticated` insert policy on `events` for this club.
