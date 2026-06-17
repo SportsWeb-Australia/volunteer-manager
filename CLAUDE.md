@@ -1,151 +1,116 @@
-# SportsWeb One — Volunteer Manager (CLAUDE.md)
+# VolunteerOne — Volunteer Manager (CLAUDE.md)
 
 Context handoff for Claude Code. This module is a Vite/React/TS app + Supabase
 (Postgres + Edge Functions) — a volunteer-management module inside SportsWeb One,
 an operating system for Australian amateur sports clubs. Owner: Carson (Click
-Sports Media / SportsWeb, Melbourne). Design language: card-based, traffic-light
-UI, "AI prepares, human commits" (every AI action lands as a reviewable Draft →
-Needs review → Approved chip). Fonts: Big Shoulders Display / Outfit / Geist Mono.
-SportsWeb red #E1342E on paper #F4F1E8, deep navy #0B1424 panels.
+Sports Media / SportsWeb, Melbourne).
 
-## Live state (as of handoff)
+## Branding (NEW — applied)
+The module is branded **VolunteerOne**, "Powered by SportsWeb One".
+- Logo: recreated as a vector in `src/components/Logo.tsx` — `VMark` (silver→teal
+  ribbon "V"), `VOneWord` ("Volunteer" ink + "One" teal), `VOneLogo` (lockup).
+- Palette (in `src/lib/theme.ts` + `src/index.css`): **brand teal `#00BFA6`**,
+  deep teal `#00917A`, brandSoft `#D4F3EE`, ink `#1F2328`, paper `#F2F4F6`,
+  silver `#C0C6CC`. **Red `#E1342E` is reserved for danger/errors/high-risk only.**
+- Primary buttons, active nav, spinner, AI/spark accents = teal. Sidebar stays
+  dark navy. Fonts: Big Shoulders Display / Outfit / Geist Mono.
+
+## Live state (as of this handoff)
 - **Supabase project:** `sportsweb-one`, ref **`uzibfawcwoapfbigpzum`** (PRODUCTION).
-  (An earlier note said `vzicgkqzkupyjzshiekk` — that was WRONG, ignore it.)
 - **Live app:** https://volunteer-manager-e8ti.vercel.app (GitHub → Vercel, repo
-  `SportsWeb-Australia/volunteer-manager`, Vite). Env vars set in Vercel:
-  `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-- **DB:** schema + addendum + seed all RUN. Then **PATCH 1** (grants/RLS/pricing)
-  must be run — see below. Test club_id `d4232df2-faae-4557-87dd-8de56840587e`,
-  staff auth user `8a5a9751-6f94-43d0-9d27-9ea1b…`, login `carson@clicksportsmedia.com`.
-- **Edge Functions: NONE deployed yet.** 7 exist in `supabase/functions/`
-  (build-roster, approve-roster, dispatch-message, billing-sync, public-signup,
-  shift-checkin, message-webhook). Until deployed, AI roster / sending / public
-  signup / check-in error out. Deploy with the Supabase CLI:
-  `supabase link --project-ref uzibfawcwoapfbigpzum` then
-  `supabase functions deploy <name>` (public-signup, shift-checkin,
-  message-webhook need `--no-verify-jwt`).
-- **Auth:** standalone magic-link login (`src/screens/Login.tsx`). There is no
-  shared SportsWeb One shell/login yet — this app authenticates on its own.
-  Supabase → Auth → URL Configuration must list the Vercel URL as Site URL +
-  Redirect URL.
+  `SportsWeb-Australia/volunteer-manager`, Vite). Env vars in Vercel:
+  `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (legacy anon JWT).
+- **DB:** schema + addendum + seed RUN. **PATCH 1 RUN** (grants/RLS to
+  `authenticated`). **PATCH 2 RUN** (`supabase/patch-2-service-role-grants.sql` —
+  grants `service_role` access so Edge Functions work; see gotchas).
+- **Edge Functions: ALL 7 DEPLOYED & WORKING** (build-roster, approve-roster,
+  dispatch-message, billing-sync, public-signup, shift-checkin, message-webhook).
+  public-signup / shift-checkin / message-webhook deployed `--no-verify-jwt`.
+- **Provider secrets: NOT SET YET.** So message *sending* (Twilio SMS / Zoho
+  ZeptoMail email / WebPushr push) and billing-sync are deployed but inert until
+  secrets are set. Compliance reminders only *draft* a message for now.
+- **Test club:** `d4232df2-faae-4557-87dd-8de56840587e`, on plan **`vm_full`**
+  (ai_roster_builder + all flags ON). Login `carson@clicksportsmedia.com`.
+- **Supabase CLI:** installed as a dev dependency — use **`npx supabase …`**.
+  Linked to the project; logged in as `info@sportsweb.com.au`. Fetch keys with
+  `npx supabase projects api-keys --project-ref uzibfawcwoapfbigpzum`.
 
 ## Architecture notes
-- Member directory is a NEW core table `people`; volunteers hang off `people`.
-- Staff/auth mapping is the existing `club_users` (read by AppContext to resolve club).
-- Module on/off uses the existing `modules` table (a `volunteers` row, enabled).
+- Member directory is core table `people`; volunteers hang off `people` (a
+  volunteer = a `volunteers` row linked to a `people.id`).
+- Staff/auth mapping is `club_users` (read by AppContext to resolve club).
+- Module on/off uses the `modules` table (`module_name='volunteers'`, enabled).
 - Entitlements are data-driven: `volunteer_settings.plan_key` → `volunteer_plans`
-  catalog. Each plan has `features = {"limits":{…},"flags":{…}}`. The app reads it
-  via RPC `vm_effective_features` (see `src/hooks/useEntitlement.ts` → `has()` /
-  `limit()`), and `<Gate feature="…">` wraps premium UI. Server-side, functions
-  call `vm_feature()` / `vm_limit()`.
+  catalog (`features = {"flags":{…},"limits":{…}}`). App reads via RPC
+  `vm_effective_features` (`src/hooks/useEntitlement.ts` → `has()` / `limit()`),
+  `<Gate feature="…">` wraps premium UI. Server-side, functions call
+  `vm_feature()` / `vm_limit()`.
 - RLS: every `volunteer_*` table + `people` is club-scoped via
-  `vm_is_club_member(club_id)` (security-definer fn reading club_users).
+  `vm_is_club_member(club_id)`. Edge Functions run as `service_role` (bypass RLS)
+  but STILL need table GRANTs — that's PATCH 2.
+- Shared form UI: `Modal`, `Field`, `FormError`, `fieldInput` in `components/ui.tsx`.
 
-## ⚠️ Run PATCH 1 first (`sportsweb_volunteer_manager_patch.sql`)
-The original migration enabled RLS and wrote policies `to authenticated` but
-**never GRANTed table privileges**, and **left `people` out of the RLS loop**.
-Result: the logged-in app gets `permission denied for table volunteer_*` and reads
-return empty. PATCH 1 (a) adds RLS to `people`, (b) GRANTs select/insert/update/
-delete to `authenticated` on `people` + all `volunteer_*` tables, (c) grants execute
-on functions, (d) sets default privileges for future tables, (e) flips
-`publish_to_website` default to true, (f) rewrites the plan catalog to the new
-pricing, (g) sets the test club to `vm_full`. **Most of the "doesn't work" backlog
-below is fixed by running this patch — re-test after running it.**
+## Pricing / tiers
+Catalog has BOTH old + new keys (live): `vm_free`($0), `vm_basic`($19),
+`vm_full`($39), plus legacy `vm_club`($29) / `vm_association`($99). Standalone
+sell uses Free / Basic / Full. `included_in_sportsweb_tiers` bundles a plan free
+on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
 
-## Pricing / tiers (DECIDED — encoded in PATCH 1)
-Standalone: **Free $0**, **Basic $19/mo** (`vm_basic`), **Full $39/mo** (`vm_full`).
-Annual = 10×. Bundled free on SportsWeb One: **Club Pro → Basic**, **Club Growth →
-Full** (SW1 tier keys `sw1_club_pro` / `sw1_club_growth` are placeholders, confirm
-real keys later). `vm_association` retained for later.
+## What works now (built/wired this session)
+- **People:** add / **edit** / remove a volunteer (creates `people` + `volunteers`).
+- **Roles:** add / **edit** / archive; click a template card to seed a club role.
+- **Volunteer Sign-ups** (renamed from "Opportunities" in UI — table is still
+  `volunteer_opportunities`, route still `/opportunities`, public-signup API field
+  still `opportunity`): create a sign-up with a public `/v/:token` link + QR.
+- **Rosters & Shifts:** "New shift" form (each shift gets a `check_in_token` → QR).
+  AI roster builder (Gate `ai_roster_builder`, unlocked on `vm_full`).
+- **Game Day Jobs:** pick jobs + date → batch-creates open shifts.
+- **Events:** list/create club events (shared `events` table — see caveat).
+- **Onboarding & Training:** `volunteer_training_records` (Gate `onboarding`).
+- **Recognition:** `volunteer_recognition` (Gate `recognition_automation`).
+- **Surveys & Feedback:** `volunteer_feedback` + average rating (Gate `surveys`).
+- **Compliance:** "Send expiry reminders" drafts a `volunteer_messages` row.
+- **Reports:** CSV download + Export PDF (browser print).
 
-| Capability | Free | Basic $19 | Full $39 |
-|---|:--:|:--:|:--:|
-| Volunteers / roles / manual rosters / game day | ✓ (cap 40) | ✓ | ✓ |
-| Email call-outs + AI comms drafts | ✓ | ✓ | ✓ |
-| Publish opportunities to website | — | ✓ | ✓ |
-| Shift check-in (QR/NFC) | ✓ | ✓ | ✓ |
-| AI roster builder | — | — | ✓ |
-| SMS (500/mo bundle) | — | — | ✓ |
-| Push notifications | — | — | ✓ |
-| Automated reminders | — | — | ✓ |
-| Compliance tracking | — | — | ✓ |
-| Onboarding & training | — | — | ✓ |
-| Recognition / Surveys | — | — | ✓ |
-| Advanced reports & exports | — | — | ✓ |
-
-Flag keys live in `volunteer_plans.features.flags`: `website_publish, channel_email,
-channel_sms, channel_push, ai_suggestions_basic, ai_comms_drafts, ai_roster_builder,
-automated_reminders, advanced_reports, exports, compliance, onboarding,
-recognition_automation, surveys, teams, seasons`. NB: `compliance` and `onboarding`
-are NEW flags — the Compliance/Onboarding screens still need `<Gate>` wiring to honour them.
-
-## BACKLOG (from Carson's first-run testing — triaged)
-
-### P0 — fixed by PATCH 1 (verify after running)
-- Volunteer People: nothing works → grant fix (reads + add/edit).
-- Roles & Descriptions: "generate role" fails → grant fix (insert).
-- Opportunities: "New opportunity" fails → grant fix (insert).
-- Communications: `permission denied for table volunteer_messages` → grant fix.
-  (NB: *creating/approving* a draft works after the patch; *sending* still needs
-  the dispatch-message function deployed + providers — see P1.)
-- Reports headline numbers show 0; Dashboard shows 0 → grant fix (reads).
-
-### P1 — needs Edge Functions deployed (Stage 3) + providers
-- AI roster builder shows but errors → deploy `build-roster`; it's Full-only and
-  enabled now that the club is `vm_full`.
-- Sending a message (after approve) → deploy `dispatch-message` + set provider
-  secrets (Twilio SMS / Zoho ZeptoMail email / WebPushr push) + `message-webhook`.
-- Public signup (`/v/:token`) → deploy `public-signup --no-verify-jwt`.
-- Check-in (QR/NFC) → deploy `shift-checkin --no-verify-jwt`; toggle method in
-  Settings → Shift check-in. **Carson still wants to test check-ins end-to-end.**
-- Billing/checkout → `billing-sync` (server-to-server, `VM_WEBHOOK_SECRET`).
-
-### P1 — code bugs (fix in repo via Claude Code)
-- **Lost form state when tab loses focus / user returns.** Cause: `AppContext`
-  `onAuthStateChange` calls `setReady(false)` on EVERY event; Supabase fires
-  `TOKEN_REFRESHED`/`SIGNED_IN` on refocus → app remounts → entered data wiped.
-  Fix: don't reset `ready` on token refresh; only handle real sign-in/out
-  transitions (ignore `TOKEN_REFRESHED`, `USER_UPDATED`), or resolve club without
-  flipping `ready` after first load.
-- **Desktop layout: gap to the left of the sidebar.** Inspect `src/components/
-  Shell.tsx` / root layout — likely a centered max-width wrapper or stray body
-  margin; sidebar should sit flush-left, content area fluid.
-
-### P2 — stub screens to build (port UX from `VolunteerManager.jsx` prototype)
-- Game Day Jobs — empty. (core rostering flavour; Basic+)
-- Events — empty.
-- Onboarding & Training — empty → Full-only, add Gate.
-- Recognition — empty → Full-only.
-- Surveys & Feedback — empty → Full-only.
-- Compliance — reads after patch, but make it operational + Full-only Gate.
-- Reports — advanced section already gated to Full; build the actual advanced
-  reports + exports for Full.
-
-### P2 — design / branding
-- **Club-branded theming**: render the module in the club's colours + logo. Source
-  brand from the `clubs` row (add/confirm brand fields) and drive `theme.ts`
-  tokens + the sidebar logo per club. High-value for selling.
-
-### Confirmed good
-- Login, club resolution, Settings (incl. Shift check-in selector), Volunteer
-  self-service view (Image) all look right. Volunteer view needs real-time test
-  once functions are live.
+## BACKLOG / next steps
+- **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`,
+  `ZEPTOMAIL_TOKEN/FROM`, `WEBPUSHR_KEY/AUTH_TOKEN`, and `VM_WEBHOOK_SECRET`
+  (billing-sync + message-webhook). `supabase secrets set …`.
+- **Events insert caveat:** `events` is shared with the club-website product and
+  has its own RLS — creating an event from here may hit a permission error.
+  Verify the `authenticated` insert policy on `events` for this club.
+- The 5 former-stub screens are functional but **basic (list + create)** — add
+  edit/delete + richer features as needed.
+- Wire billing checkout (`billing-sync` is server-to-server, needs VM_WEBHOOK_SECRET).
+- `volunteer-manager` repo has **no club-website business** — keep the Dookie /
+  club sites in their OWN repos (a wrong "Upload files" once pushed the Dookie
+  site here; recovered, backup on branch `dookie-site-backup`).
 
 ## Gotchas already hit (don't re-discover)
-1. Wrong project ref `vzicgkqzkupyjzshiekk` → real is `uzibfawcwoapfbigpzum`.
-2. Vercel env vars only bake in at **build time** → after editing, **redeploy
-   without build cache**. Names MUST start with `VITE_`.
-3. Supabase has new-style keys (`sb_publishable_…`); the app uses the legacy
-   `anon` JWT (`eyJ…`). If legacy keys get disabled, switch the client to the
-   publishable key.
-4. Magic-link login needs the site URL in Supabase Auth → URL Configuration.
-5. Migration was missing GRANTs + `people` RLS (PATCH 1).
-6. `created_by` etc. are uuid — never pass string sentinels like `'ai'` in seeds.
+1. Real project ref is `uzibfawcwoapfbigpzum`.
+2. Vercel env vars bake in at **build time** → redeploy without cache after editing.
+   Names MUST start with `VITE_`.
+3. **PATCH 1** granted privileges to `authenticated` only. **PATCH 2** was needed
+   to GRANT `service_role` on `volunteer_*` + `people` + `modules` — without it
+   every Edge Function 500s with "permission denied for table volunteer_*"
+   (symptom: dead `/v/:token` signup links). Re-run `patch-2-service-role-grants.sql`
+   if new tables are added.
+4. `created_by` etc. are uuid — never pass string sentinels like `'ai'`
+   (build-roster hit this; pass `null`).
+5. **`npm run typecheck` (`tsc -b`) is broken** (tsconfig project-ref `noEmit`
+   error). The real build is `npm run build` (vite/esbuild, no full typecheck) —
+   that's what Vercel runs. Verify changes with `npm run build`.
+6. `.gitignore` was missing originally (added) — never `git add` `node_modules/`
+   or `dist/`.
+7. Magic-link login needs the Vercel URL in Supabase Auth → URL Configuration.
+8. Repo is sometimes maintained via GitHub web "Upload files" (commits read
+   "Add files via upload") — be careful which repo you're uploading into.
 
 ## Repo layout
 `src/lib` (supabase, theme, types, entitlements, api) · `src/context/AppContext.tsx`
-· `src/hooks/useEntitlement.ts` · `src/components` (ui, Gate, Shell, Qr) ·
-`src/screens/*` (real: Dashboard, People, Roles, Rosters, Communications,
-Compliance, Reports, Billing, Opportunities, Settings, PublicSignup, CheckIn,
-Login, VolunteerView; stubs via Stub.tsx) · `supabase/functions/*` (7 fns) ·
-`VolunteerManager.jsx` = original prototype (port stub UX from here).
+· `src/hooks/useEntitlement.ts` · `src/components` (ui, Logo, Gate, Shell, Qr) ·
+`src/screens/*` (Dashboard, People, Roles, Opportunities[=Volunteer Sign-ups],
+Rosters, GameDay, Events, Compliance, Onboarding, Communications, Recognition,
+Surveys, Reports, Billing, Settings, PublicSignup, CheckIn, Login, VolunteerView)
+· `supabase/functions/*` (7 fns) · `supabase/patch-2-service-role-grants.sql` ·
+`VolunteerManager.jsx` = original prototype.
