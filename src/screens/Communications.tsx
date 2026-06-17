@@ -19,6 +19,7 @@ export function Communications() {
   const [subject, setSubject] = useState("Volunteers needed this weekend");
   const [stage, setStage] = useState<Stage>("Needs review");
   const [channels, setChannels] = useState<string[]>(["Email"]);
+  const [category, setCategory] = useState<"operational" | "marketing">("operational");
   const [messageId, setMessageId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export function Communications() {
 
   const newDraft = (body?: string) => {
     setDraft(body ?? "Hi everyone! We're short a few hands for this Saturday's home games. If you can spare an hour on the canteen or BBQ, tap 'Put my hand up' below. Thanks team! 🧡");
-    setStage("Needs review"); setMessageId(null); setResult(null); setErr(null);
+    setStage("Needs review"); setMessageId(null); setResult(null); setErr(null); setCategory("operational");
   };
 
   const approve = async () => {
@@ -56,7 +57,7 @@ export function Communications() {
     setBusy(true); setErr(null);
     try {
       const { data, error } = await supabase.from("volunteer_messages").insert({
-        club_id: clubId, type: "call_out", title: subject, subject, body: draft,
+        club_id: clubId, type: "call_out", title: subject, subject, body: draft, category,
         channels: channels.map(c => c.toLowerCase()), audience: { statuses: ["active"] },
         status: "approved", approved_at: new Date().toISOString(),
       }).select("id").single();
@@ -108,6 +109,15 @@ export function Communications() {
             style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1px solid ${T.line}`, fontSize: 13.5, fontFamily: "inherit", marginBottom: 9 }} />
           <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={4} disabled={stage !== "Needs review"}
             style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${T.line}`, fontSize: 14, fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }} />
+          <div style={{ display: "flex", gap: 7, margin: "12px 0 0", flexWrap: "wrap", alignItems: "center" }}>
+            <span className="eyebrow">Type</span>
+            {(["operational", "marketing"] as const).map(c => (
+              <button key={c} disabled={stage !== "Needs review"} onClick={() => setCategory(c)}
+                style={{ border: `1px solid ${category === c ? T.navy : T.line}`, background: category === c ? T.navy : "#fff", color: category === c ? "#fff" : T.muted, padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer", textTransform: "capitalize" }}>{c}</button>
+            ))}
+          </div>
+          {category === "marketing" && <div style={{ fontSize: 12, color: T.muted, margin: "8px 0 0" }}>Marketing only sends to volunteers who opted in, and an opt-out (SMS "STOP" / email unsubscribe) is added automatically. Rosters, reminders &amp; check-in stay operational.</div>}
+
           <div style={{ display: "flex", gap: 7, margin: "12px 0", flexWrap: "wrap", alignItems: "center" }}>
             <span className="eyebrow">Send via</span>
             {CHANNELS.map(([ch, allowed]) => {

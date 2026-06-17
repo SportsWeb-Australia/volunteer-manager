@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     // load the message
     const { data: msg, error: msgErr } = await db.from("volunteer_messages")
-      .select("id,club_id,title,subject,body,channels,audience,status").eq("id", message_id).single();
+      .select("id,club_id,title,subject,body,channels,audience,status,category").eq("id", message_id).single();
     if (msgErr || !msg) return json(404, { error: "message not found" });
     const club = msg.club_id as string;
 
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
 
     // resolve recipients (SMS/email need per-person contact; push goes to all subscribers)
     const aud = (msg.audience ?? {}) as { volunteer_ids?: string[]; statuses?: string[] };
-    let vq = db.from("volunteers").select("id,person_id,status,person:people(full_name,first_name,email,mobile)").eq("club_id", club);
+    let vq = db.from("volunteers").select("id,person_id,status,person:people(full_name,first_name,email,mobile,sms_marketing_consent,email_marketing_consent,marketing_opt_out,unsubscribe_token)").eq("club_id", club);
     vq = aud.volunteer_ids?.length ? vq.in("id", aud.volunteer_ids) : vq.in("status", aud.statuses?.length ? aud.statuses : ["active"]);
     const { data: vols } = await vq;
 
@@ -108,6 +108,8 @@ Deno.serve(async (req) => {
       }
     }
     const SMS_UNIT_COST = 0.08; // rough AUD per SMS, for usage/cost reporting
+    const isMarketing = (msg.category ?? "operational") === "marketing";
+    const FN_BASE = Deno.env.get("SUPABASE_URL")! + "/functions/v1";
 
     const results: Record<string, { sent: number; failed: number; provider_ref?: string; error?: string; over_allowance?: number }> = {};
 
@@ -134,11 +136,23 @@ Deno.serve(async (req) => {
         const who = nameOf(person);
         const addr = ch === "sms" ? (person?.mobile as string) : (person?.email as string);
         if (!addr) continue;
+
+        // Marketing requires per-channel consent and respects opt-out; operational bypasses.
+        if (isMarketing) {
+          if (person?.marketing_opt_out) continue;
+          const consent = ch === "sms" ? person?.sms_marketing_consent : person?.email_marketing_consent;
+          if (!consent) continue;
+        }
         if (ch === "sms" && sent >= smsRemaining) { overQuota++; continue; } // SMS allowance reached
 
+        const baseBody = fill(msg.body ?? "", who);
+        const token = person?.unsubscribe_token as string | undefined;
         const r: SendResult = ch === "sms"
-          ? await sendSms(addr, fill(msg.body ?? "", who), smsFrom)
-          : await sendEmail(addr, msg.subject ?? msg.title ?? "Club update", htmlBody(fill(msg.body ?? "", who)), who);
+          ? await sendSms(addr, isMarketing ? `${baseBody}\nReply STOP to opt out.` : baseBody, smsFrom)
+          : await sendEmail(addr, msg.subject ?? msg.title ?? "Club update",
+              isMarketing
+                ? htmlBody(baseBody) + `<div style="margin-top:16px;font-size:12px;color:#8A8F96">You're receiving club updates you opted in to. <a href="${FN_BASE}/unsubscribe?t=${token}" style="color:#00917A">Unsubscribe</a>.</div>`
+                : htmlBody(baseBody), who);
         r.ok ? sent++ : (failed++, lastErr = r.error);
 
         await db.from("volunteer_message_recipients").insert({

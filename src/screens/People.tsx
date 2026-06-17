@@ -10,7 +10,7 @@ const ci = (s: string) => PALETTE[(s.charCodeAt(0) + s.length) % PALETTE.length]
 const FILTERS = ["All", "active", "applied", "approved", "paused", "prospect"];
 const ADD_STATUSES: VolunteerStatus[] = ["active", "approved", "applied", "prospect", "paused"];
 
-const SELECT = "id,status,person:people(id,full_name,mobile,email),profile:volunteer_profiles(preferred_roles,internal_tags)";
+const SELECT = "id,status,person:people(id,full_name,mobile,email,sms_marketing_consent,email_marketing_consent),profile:volunteer_profiles(preferred_roles,internal_tags)";
 
 export function People() {
   const { clubId } = useApp();
@@ -27,6 +27,8 @@ export function People() {
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<VolunteerStatus>("active");
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [emailConsent, setEmailConsent] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -42,14 +44,18 @@ export function People() {
 
   const openAdd = () => {
     setEditVolId(null); setEditPersonId(null);
-    setFullName(""); setMobile(""); setEmail(""); setStatus("active"); setErr(null);
+    setFullName(""); setMobile(""); setEmail(""); setStatus("active");
+    setSmsConsent(false); setEmailConsent(false); setErr(null);
     setOpen(true);
   };
 
   const openEdit = (r: Volunteer) => {
+    const p = r.person as (typeof r.person & { sms_marketing_consent?: boolean; email_marketing_consent?: boolean }) | null;
     setEditVolId(r.id); setEditPersonId(r.person?.id ?? null);
     setFullName(r.person?.full_name ?? ""); setMobile(r.person?.mobile ?? ""); setEmail(r.person?.email ?? "");
-    setStatus(r.status); setErr(null);
+    setStatus(r.status);
+    setSmsConsent(Boolean(p?.sms_marketing_consent)); setEmailConsent(Boolean(p?.email_marketing_consent));
+    setErr(null);
     setOpen(true);
   };
 
@@ -65,6 +71,8 @@ export function People() {
       last_name: parts.length > 1 ? parts.slice(1).join(" ") : null,
       mobile: mobile.trim() || null,
       email: email.trim() || null,
+      sms_marketing_consent: smsConsent,
+      email_marketing_consent: emailConsent,
     };
     try {
       if (editVolId && editPersonId) {
@@ -166,6 +174,17 @@ export function People() {
               {ADD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </Field>
+
+          <div style={{ marginBottom: 13 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: T.muted, marginBottom: 6 }}>Marketing consent</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, marginBottom: 6, cursor: "pointer" }}>
+              <input type="checkbox" checked={smsConsent} onChange={e => setSmsConsent(e.target.checked)} /> Opted in to marketing SMS
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, cursor: "pointer" }}>
+              <input type="checkbox" checked={emailConsent} onChange={e => setEmailConsent(e.target.checked)} /> Opted in to marketing email
+            </label>
+            <div style={{ fontSize: 11.5, color: T.muted, marginTop: 6 }}>Operational messages (rosters, reminders, check-in) always send regardless.</div>
+          </div>
 
           {err && <FormError>{err}</FormError>}
 

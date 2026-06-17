@@ -23,8 +23,10 @@ The module is branded **VolunteerOne**, "Powered by SportsWeb One".
 - **DB:** schema + addendum + seed RUN. **PATCH 1 RUN** (grants/RLS to
   `authenticated`). **PATCH 2 RUN** (`supabase/patch-2-service-role-grants.sql` —
   grants `service_role` access so Edge Functions work; see gotchas).
-  **PATCH 3** (`supabase/patch-3-sms-metering.sql`) — SMS metering + trial +
-  sender identity + free push/email + `vm_sms_quota()` RPC. **RUN THIS.**
+  **PATCH 3** (`patch-3-sms-metering.sql`) — SMS metering + trial + sender identity
+  + free push/email + `vm_sms_quota()`. **PATCH 4** (`patch-4-sms-packs.sql`) —
+  credits/packs. **PATCH 5** (`patch-5-marketing-consent.sql`) — marketing consent +
+  opt-out. **RUN 3, 4, 5 IN ORDER.**
 - **Edge Functions: ALL 7 DEPLOYED & WORKING** (build-roster, approve-roster,
   dispatch-message, billing-sync, public-signup, shift-checkin, message-webhook).
   public-signup / shift-checkin / message-webhook deployed `--no-verify-jwt`.
@@ -92,8 +94,18 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
   approved→rejected; you approve by setting `sms_sender_status='approved'`). Billing
   shows SMS packs + current usage. AU rule: alphanumeric senders need registration
   from **1 Jul 2026** — register the platform sender; club senders are a paid add-on.
-- **Phase C:** enforce transactional-vs-marketing (`volunteer_messages.category`),
-  marketing consent capture + STOP/opt-out handling.
+- **Phase C DONE (code) — needs PATCH 5 (`supabase/patch-5-marketing-consent.sql`):**
+  consent on `people` (sms/email_marketing_consent, marketing_opt_out, unsubscribe_token);
+  dispatch-message gates **marketing** by per-channel consent + opt-out and appends
+  opt-out (SMS "Reply STOP", email unsubscribe link); **operational** bypasses.
+  New functions: `unsubscribe` (email link page), `sms-inbound` (STOP/START →
+  vm_marketing_opt_out/in_by_mobile). Communications has an operational/marketing
+  toggle; People edit modal records consent.
+  **Checkout scaffold (provider-agnostic):** `create-checkout` (Stripe adapter for
+  one-time SMS packs; inert until `PAYMENT_PROVIDER=stripe` + `STRIPE_SECRET_KEY`) →
+  `payment-webhook` (?key-guarded; grants the pack). Billing buttons call it with a
+  graceful "not configured" fallback. **OPEN: confirm payment provider (Stripe vs
+  Zoho Billing).** Stripe webhook needs real signature verification before prod.
 
 ## BACKLOG / next steps
 - **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`
@@ -136,5 +148,7 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
 `src/screens/*` (Dashboard, People, Roles, Opportunities[=Volunteer Sign-ups],
 Rosters, GameDay, Events, Compliance, Onboarding, Communications, Recognition,
 Surveys, Reports, Billing, Settings, PublicSignup, CheckIn, Login, VolunteerView)
-· `supabase/functions/*` (7 fns) · `supabase/patch-2-service-role-grants.sql` ·
-`VolunteerManager.jsx` = original prototype.
+· `supabase/functions/*` (11 fns: build-roster, approve-roster, dispatch-message,
+billing-sync, public-signup, shift-checkin, message-webhook, unsubscribe,
+sms-inbound, create-checkout, payment-webhook) · `supabase/patch-*.sql` (run in
+order) · `VolunteerManager.jsx` = original prototype.

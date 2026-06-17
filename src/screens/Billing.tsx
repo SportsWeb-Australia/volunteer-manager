@@ -54,6 +54,18 @@ export function Billing() {
     return () => { cancelled = true; };
   }, [clubId]);
 
+  const checkout = async (kind: "sms_pack" | "plan", opts: Record<string, unknown>) => {
+    if (!clubId) return;
+    const { data, error } = await supabase.functions.invoke("create-checkout", {
+      body: { club_id: clubId, kind, ...opts, success_url: window.location.href, cancel_url: window.location.href },
+    });
+    const d = data as { url?: string; configured?: boolean; note?: string } | null;
+    if (error) { alert("Couldn't start checkout. Please try again."); return; }
+    if (d?.url) { window.location.href = d.url; return; }
+    if (d?.configured === false) { alert("Online checkout isn't switched on yet — add the payment provider keys to enable it."); return; }
+    alert(d?.note ?? "Checkout isn't available for this item yet.");
+  };
+
   if (loading) return <Loading />;
 
   return (
@@ -87,7 +99,7 @@ export function Billing() {
               </div>
               {current
                 ? <Btn kind="ghost" full>Current plan</Btn>
-                : <Btn kind="primary" icon="bolt" full onClick={() => alert("Wires to billing-sync / checkout in Phase C.")}>Choose {p.name.replace("Volunteer Manager — ", "")}</Btn>}
+                : <Btn kind="primary" icon="bolt" full onClick={() => checkout("plan", { plan_key: p.key, amount: p.price_monthly })}>Choose {p.name.replace("Volunteer Manager — ", "")}</Btn>}
             </Card>
           );
         })}
@@ -108,7 +120,7 @@ export function Billing() {
             <Card key={p.sms} pad={18}>
               <div className="disp" style={{ fontSize: 24 }}>{p.sms.toLocaleString()} SMS</div>
               <div style={{ margin: "4px 0 14px" }}><span className="disp" style={{ fontSize: 26, color: T.ink }}>${p.price}</span></div>
-              <Btn full icon="bolt" onClick={() => alert("SMS pack checkout wires to billing-sync in Phase C.")}>Buy pack</Btn>
+              <Btn full icon="bolt" onClick={() => checkout("sms_pack", { sms_count: p.sms, amount: p.price })}>Buy pack</Btn>
             </Card>
           ))}
         </div>
