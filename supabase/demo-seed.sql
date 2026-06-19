@@ -25,6 +25,8 @@ begin
   delete from volunteer_recognition         where club_id = c;
   delete from volunteer_feedback            where club_id = c;
   delete from volunteer_ai_suggestions      where club_id = c;
+  delete from team_members                  where club_id = c;
+  delete from teams                         where club_id = c;
   delete from volunteer_profiles            where club_id = c;
   delete from volunteers                    where club_id = c;
   delete from people                        where club_id = c;
@@ -76,6 +78,26 @@ select 'de300000-0000-4000-a000-000000000001'::uuid,
        ('de302000-0000-4000-a000-' || lpad(i::text, 12, '0'))::uuid,
        'active', (array['Canteen','BBQ','Gate','Timekeeper'])[1:1 + (i % 3)], 1 + (i % 3)
 from generate_series(1,8) i;
+
+-- ============================================================ teams + members
+insert into teams (id, club_id, name, age_group, gender, grade, status)
+select ('de308000-0000-4000-a000-' || lpad(t.i::text, 12, '0'))::uuid,
+       'de300000-0000-4000-a000-000000000001'::uuid, t.name, t.ag, t.gender, t.grade, 'published'
+from (values
+  (1,'Under 12 Red','U12','Mixed','Division 2'),
+  (2,'Under 14 Netball B','U14','Female','B Grade'),
+  (3,'Seniors Reserves','Open','Male','Reserves')
+) as t(i,name,ag,gender,grade);
+
+insert into team_members (club_id, team_id, person_id, role, status)
+select 'de300000-0000-4000-a000-000000000001'::uuid,
+       ('de308000-0000-4000-a000-' || lpad(t.team::text, 12, '0'))::uuid,
+       ('de301000-0000-4000-a000-' || lpad(t.person::text, 12, '0'))::uuid, t.role, 'active'
+from (values
+  (1,1,'coach'),(1,2,'player'),(1,3,'player'),(1,4,'player'),
+  (2,5,'manager'),(2,6,'player'),(2,7,'player'),
+  (3,8,'player'),(3,9,'player'),(3,10,'player')
+) as t(team,person,role);
 
 -- ============================================================ roles
 insert into volunteer_roles (id, club_id, title, category, risk_level, required_checks, status)
