@@ -22,6 +22,7 @@ const NAV: [string, string, string][] = [
   ["Reports", "/reports", "report"],
   ["Plan & Billing", "/billing", "card"],
   ["Settings", "/settings", "cog"],
+  ["Help & Guide", "/help", "help"],
 ];
 
 function Brand({ mini }: { mini?: boolean }) {

@@ -23,6 +23,7 @@ import { Events } from "./screens/Events";
 import { Onboarding } from "./screens/Onboarding";
 import { Recognition } from "./screens/Recognition";
 import { Surveys } from "./screens/Surveys";
+import { Help } from "./screens/Help";
 
 function NoticeScreen({ title, body, icon }: { title: string; body: string; icon: string }) {
   return (
@@ -69,6 +70,7 @@ export function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="help" element={<Help />} />
       </Route>
     </Routes>
   );

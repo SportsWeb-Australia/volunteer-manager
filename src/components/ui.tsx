@@ -26,6 +26,7 @@ const PATHS: Record<string, string> = {
   card: "M3 6h18v12H3zM3 10h18",
   onboard: "M12 3v12M8 11l4 4 4-4M5 19h14",
   survey: "M5 4h14v16H5zM9 9h6M9 13h6M9 17h3",
+  help: "M12 3a9 9 0 100 18 9 9 0 000-18zM9.6 9a2.5 2.5 0 014.6 1.3c0 1.7-2.2 2-2.2 3.4M12 16.5h.01",
 };
 
 export function Icon({ n, s = 20, c = "currentColor", sw = 1.7 }: { n: string; s?: number; c?: string; sw?: number }) {
