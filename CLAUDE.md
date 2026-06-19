@@ -125,6 +125,21 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
 - Free **trial** is the separate path (billing-sync `source:"trial"`): a club's own
   empty club, vm_full + 25-SMS cap, auto-expires.
 
+## Shared notification layer (cross-module)
+- Provider adapters live in **`supabase/functions/_shared/providers.ts`** (ClickSend/
+  ZeptoMail/WebPushr) — imported by every module.
+- **`notify`** Edge Function = the shared transactional send API for ANY SportsWeb One
+  module (Ticket One, Registrations, …). Server-to-server, guarded by header
+  `x-webhook-secret: <VM_WEBHOOK_SECRET>`. It does delivery only (no audience logic):
+  `POST /functions/v1/notify { club_id, channel:"email"|"sms"|"push", to, subject, body,
+  html?, from_name?, target_url?, category? }` → sends + logs best-effort to `club_messages`.
+  Email from-name defaults to the club's name; SMS uses the club's approved sender or platform.
+- Two layers: each module owns its **audience** (who) and calls `notify` for **delivery**
+  (how). VolunteerOne's `dispatch-message` keeps its volunteer/team audience resolution and
+  uses the same shared adapters directly (per-recipient loop, not via notify HTTP).
+  - NOTE: `notify`'s `club_messages` insert needs service_role INSERT on `club_messages`
+    (not granted yet — logging fails silently until granted; sending is unaffected).
+
 ## Team-targeted comms (shared, club-wide)
 - dispatch-message resolves recipients by **team**: audience `{ team_ids:[...],
   team_roles?:[...], scope:"members"|"volunteers" }` → reads `team_members`
