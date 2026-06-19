@@ -23,7 +23,7 @@
 //   Push:     WEBPUSHR_KEY, WEBPUSHR_AUTH_TOKEN
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendSms, sendEmail, sendPush, type SendResult } from "./providers.ts";
+import { sendSms, sendEmail, sendPush, type SendResult } from "../_shared/providers.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
