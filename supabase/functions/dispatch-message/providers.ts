@@ -62,7 +62,7 @@ async function sendSmsClickSend(to: string, body: string, fromOverride?: string)
 //   optional ZEPTOMAIL_HOST (default api.zeptomail.com; .com.au / .eu etc per DC)
 // Note: for bulk newsletters you'd route to Zoho Campaigns instead (list-based);
 //   ZeptoMail is the right per-recipient sender for volunteer comms.
-export async function sendEmail(to: string, subject: string, html: string, toName?: string): Promise<SendResult> {
+export async function sendEmail(to: string, subject: string, html: string, toName?: string, fromName?: string): Promise<SendResult> {
   const token = Deno.env.get("ZEPTOMAIL_TOKEN");
   const from = Deno.env.get("ZEPTOMAIL_FROM");
   const host = Deno.env.get("ZEPTOMAIL_HOST") ?? "api.zeptomail.com";
@@ -72,7 +72,7 @@ export async function sendEmail(to: string, subject: string, html: string, toNam
     method: "POST",
     headers: { Authorization: token, "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
-      from: { address: from, name: "Club Volunteers" },
+      from: { address: from, name: fromName || "VolunteerOne" },
       to: [{ email_address: { address: to, name: toName ?? to } }],
       subject, htmlbody: html,
     }),

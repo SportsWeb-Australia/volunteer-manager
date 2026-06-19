@@ -110,6 +110,9 @@ Deno.serve(async (req) => {
     const SMS_UNIT_COST = 0.08; // rough AUD per SMS, for usage/cost reporting
     const isMarketing = (msg.category ?? "operational") === "marketing";
     const FN_BASE = Deno.env.get("SUPABASE_URL")! + "/functions/v1";
+    // Email sender name = the club's own name (falls back to VolunteerOne).
+    const { data: clubRow } = await db.from("clubs").select("name").eq("id", club).maybeSingle();
+    const clubName = (clubRow?.name as string) || undefined;
 
     const results: Record<string, { sent: number; failed: number; provider_ref?: string; error?: string; over_allowance?: number }> = {};
 
@@ -152,7 +155,7 @@ Deno.serve(async (req) => {
           : await sendEmail(addr, msg.subject ?? msg.title ?? "Club update",
               isMarketing
                 ? htmlBody(baseBody) + `<div style="margin-top:16px;font-size:12px;color:#8A8F96">You're receiving club updates you opted in to. <a href="${FN_BASE}/unsubscribe?t=${token}" style="color:#00917A">Unsubscribe</a>.</div>`
-                : htmlBody(baseBody), who);
+                : htmlBody(baseBody), who, clubName);
         r.ok ? sent++ : (failed++, lastErr = r.error);
 
         await db.from("volunteer_message_recipients").insert({
