@@ -28,6 +28,12 @@ const ZEPTO: Record<string, string> = {
   email_open: "opened", open: "opened", click: "clicked", email_click: "clicked",
   softbounce: "bounced", hardbounce: "bounced", bounce: "bounced", spam: "bounced",
 };
+// ClickSend delivery-receipt status -> our status
+const CLICKSEND: Record<string, string> = {
+  delivered: "delivered", sent: "sent", queued: "queued",
+  undelivered: "failed", failed: "failed", bounced: "failed",
+  "hard bounce": "failed", "soft bounce": "failed", rejected: "failed",
+};
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("POST only", { status: 405 });
@@ -52,13 +58,16 @@ Deno.serve(async (req) => {
       if (status === "sent") patch.sent_at = now;
       if (status === "failed") patch.error = form.get("ErrorCode") ?? "undelivered";
     } else {
-      // ZeptoMail (and other JSON providers)
+      // JSON providers: ZeptoMail (email events) + ClickSend (SMS delivery receipts)
       const body = await req.json().catch(() => ({})) as any;
       const ev = body?.event_name ?? body?.["event-name"] ?? body?.event ?? body?.[0]?.event;
-      providerId = body?.message_id ?? body?.request_id ?? body?.data?.message_id ?? body?.[0]?.message_id;
-      status = ZEPTO[String(ev ?? "").toLowerCase()];
+      providerId = body?.message_id ?? body?.messageid ?? body?.request_id ?? body?.data?.message_id ?? body?.[0]?.message_id;
+      status = ZEPTO[String(ev ?? "").toLowerCase()] ?? CLICKSEND[String(body?.status ?? "").toLowerCase()];
       if (status === "opened") patch.opened_at = now;
       if (status === "clicked") patch.clicked_at = now;
+      if (status === "delivered") patch.delivered_at = now;
+      if (status === "sent") patch.sent_at = now;
+      if (status === "failed") patch.error = body?.error_text ?? body?.error_code ?? "undelivered";
     }
 
     if (providerId && status) {
