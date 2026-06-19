@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
       let sent = 0, failed = 0, overQuota = 0, lastErr: string | undefined;
 
       if (ch === "push") {
-        const r: SendResult = await sendPush(msg.title ?? msg.subject ?? "Club update", msg.body ?? "");
+        const r: SendResult = await sendPush(msg.title ?? msg.subject ?? "Club update", msg.body ?? "", undefined, club);
         r.ok ? sent++ : (failed++, lastErr = r.error);
         await db.from("volunteer_message_dispatches").update({
           status: r.ok ? "sent" : "failed", sent_at: new Date().toISOString(),

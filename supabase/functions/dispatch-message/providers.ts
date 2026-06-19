@@ -86,16 +86,25 @@ export async function sendEmail(to: string, subject: string, html: string, toNam
 // --- Web push · WebPushr (send to all subscribers / a segment) -------------
 // Env: WEBPUSHR_KEY, WEBPUSHR_AUTH_TOKEN
 // (Zoho PageSense push is an alternative; same shape — swap this adapter.)
-export async function sendPush(title: string, message: string, targetUrl?: string): Promise<SendResult> {
+// clubId → send only to that club's subscribers (tagged with the club_id
+// attribute on the client). Omit clubId to broadcast to all subscribers.
+export async function sendPush(title: string, message: string, targetUrl?: string, clubId?: string): Promise<SendResult> {
   const key = Deno.env.get("WEBPUSHR_KEY");
   const auth = Deno.env.get("WEBPUSHR_AUTH_TOKEN");
   if (!key || !auth) return { ok: false, error: "WebPushr env not set (WEBPUSHR_KEY / WEBPUSHR_AUTH_TOKEN)" };
 
-  const res = await fetch("https://api.webpushr.com/v1/notification/send/all", {
+  const endpoint = clubId
+    ? "https://api.webpushr.com/v1/notification/send/attribute"
+    : "https://api.webpushr.com/v1/notification/send/all";
+  const body: Record<string, unknown> = { title, message, target_url: targetUrl ?? "" };
+  if (clubId) body.attribute = { club_id: clubId };
+
+  const res = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "webpushr-key": key, "webpushr-auth-token": auth },
-    body: JSON.stringify({ title, message, target_url: targetUrl ?? "" }),
+    // WebPushr auth headers are camelCase (NOT hyphenated).
+    headers: { "Content-Type": "application/json", "webpushrKey": key, "webpushrAuthToken": auth },
+    body: JSON.stringify(body),
   });
   const d = await res.json().catch(() => ({}));
-  return res.ok ? { ok: true, providerId: String(d?.id ?? d?.data?.id ?? "") } : { ok: false, error: d?.description ?? `WebPushr ${res.status}` };
+  return res.ok ? { ok: true, providerId: String(d?.id ?? d?.data?.id ?? "") } : { ok: false, error: d?.description ?? d?.message ?? `WebPushr ${res.status}` };
 }

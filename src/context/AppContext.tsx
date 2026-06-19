@@ -77,6 +77,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, []);
 
+  // Tag this browser's push subscription with the club, so club-scoped push
+  // (WebPushr send-to-attribute) only reaches this club's volunteers.
+  useEffect(() => {
+    const wp = (window as unknown as { webpushr?: (...a: unknown[]) => void }).webpushr;
+    if (clubId && typeof wp === "function") wp("attributes", { club_id: clubId });
+  }, [clubId]);
+
   const signOut = async () => { await supabase.auth.signOut(); };
 
   return (
