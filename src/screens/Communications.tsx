@@ -22,6 +22,10 @@ export function Communications() {
   const [stage, setStage] = useState<Stage>("Needs review");
   const [channels, setChannels] = useState<string[]>(["Email"]);
   const [category, setCategory] = useState<"operational" | "marketing">("operational");
+  const [teams, setTeams] = useState<{ id: string; name: string; age_group: string | null }[]>([]);
+  const [audienceMode, setAudienceMode] = useState<"all" | "teams">("all");
+  const [selTeams, setSelTeams] = useState<Set<string>>(new Set());
+  const [teamScope, setTeamScope] = useState<"members" | "volunteers">("members");
   const [messageId, setMessageId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -41,11 +45,12 @@ export function Communications() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [{ data }, { data: msgs }] = await Promise.all([
+      const [{ data }, { data: msgs }, { data: tms }] = await Promise.all([
         supabase.from("volunteer_message_templates").select("id,name,body,subject,type,club_id").or(`club_id.eq.${clubId},club_id.is.null`).order("name"),
         supabase.from("volunteer_messages").select("id,title,subject,category,channels,status,sent_at").eq("club_id", clubId).order("created_at", { ascending: false }).limit(8),
+        supabase.from("teams").select("id,name,age_group").eq("club_id", clubId).order("name"),
       ]);
-      if (!cancelled) { setTemplates((data as Template[]) ?? []); setMessages((msgs as Msg[]) ?? []); setLoading(false); loadQuota(); }
+      if (!cancelled) { setTemplates((data as Template[]) ?? []); setMessages((msgs as Msg[]) ?? []); setTeams((tms as { id: string; name: string; age_group: string | null }[]) ?? []); setLoading(false); loadQuota(); }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,15 +59,19 @@ export function Communications() {
   const newDraft = (body?: string) => {
     setDraft(body ?? "Hi everyone! We're short a few hands for this Saturday's home games. If you can spare an hour on the canteen or BBQ, tap 'Put my hand up' below. Thanks team! 🧡");
     setStage("Needs review"); setMessageId(null); setResult(null); setErr(null); setCategory("operational");
+    setAudienceMode("all"); setSelTeams(new Set()); setTeamScope("members");
   };
 
   const approve = async () => {
     if (!clubId || !draft) return;
     setBusy(true); setErr(null);
     try {
+      const audience = audienceMode === "teams" && selTeams.size
+        ? { team_ids: [...selTeams], scope: teamScope }
+        : { statuses: ["active"] };
       const { data, error } = await supabase.from("volunteer_messages").insert({
         club_id: clubId, type: "call_out", title: subject, subject, body: draft, category,
-        channels: channels.map(c => c.toLowerCase()), audience: { statuses: ["active"] },
+        channels: channels.map(c => c.toLowerCase()), audience,
         status: "approved", approved_at: new Date().toISOString(),
       }).select("id").single();
       if (error) throw error;
@@ -132,6 +141,36 @@ export function Communications() {
             })}
           </div>
 
+          <div style={{ display: "flex", gap: 7, margin: "12px 0 0", flexWrap: "wrap", alignItems: "center" }}>
+            <span className="eyebrow">Audience</span>
+            {(["all", "teams"] as const).map(m => (
+              <button key={m} disabled={stage !== "Needs review"} onClick={() => setAudienceMode(m)}
+                style={{ border: `1px solid ${audienceMode === m ? T.navy : T.line}`, background: audienceMode === m ? T.navy : "#fff", color: audienceMode === m ? "#fff" : T.muted, padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{m === "all" ? "All active volunteers" : "Specific teams"}</button>
+            ))}
+          </div>
+          {audienceMode === "teams" && (
+            <div style={{ marginTop: 9 }}>
+              {teams.length === 0
+                ? <div style={{ fontSize: 12.5, color: T.muted }}>No teams found for this club yet.</div>
+                : <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {teams.map(t => {
+                      const on = selTeams.has(t.id);
+                      return <button key={t.id} disabled={stage !== "Needs review"} onClick={() => setSelTeams(p => { const n = new Set(p); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })}
+                        style={{ border: `1px solid ${on ? T.brand : T.line}`, background: on ? T.brand : "#fff", color: on ? "#fff" : T.ink, padding: "6px 11px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>{t.name}{t.age_group ? ` · ${t.age_group}` : ""}</button>;
+                    })}
+                  </div>}
+              <div style={{ display: "flex", gap: 7, marginTop: 9, alignItems: "center" }}>
+                <span className="eyebrow">Send to</span>
+                {(["members", "volunteers"] as const).map(s => (
+                  <button key={s} disabled={stage !== "Needs review"} onClick={() => setTeamScope(s)}
+                    style={{ border: `1px solid ${teamScope === s ? T.navy : T.line}`, background: teamScope === s ? T.navy : "#fff", color: teamScope === s ? "#fff" : T.muted, padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{s === "members" ? "All team members" : "Volunteers only"}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11.5, color: T.muted, marginTop: 7 }}>Team sends go by email/SMS — push can't target a single team yet.</div>
+            </div>
+          )}
+
+          <div style={{ height: 12 }} />
           {err && <div style={{ color: T.red, fontSize: 13, marginBottom: 10 }}>{err}</div>}
           {result && <div style={{ color: T.green, fontSize: 13.5, fontWeight: 600, marginBottom: 10 }}>{result}</div>}
 

@@ -125,6 +125,17 @@ on a SW1 tier. Flag keys live in `volunteer_plans.features.flags`.
 - Free **trial** is the separate path (billing-sync `source:"trial"`): a club's own
   empty club, vm_full + 25-SMS cap, auto-expires.
 
+## Team-targeted comms (shared, club-wide)
+- dispatch-message resolves recipients by **team**: audience `{ team_ids:[...],
+  team_roles?:[...], scope:"members"|"volunteers" }` → reads `team_members`
+  (person↔team, role player/coach/manager) → `people` contact. "members" = any
+  club member in the team (the SportsWeb-One-wide capability), "volunteers" = only
+  volunteers. Existing `{statuses}` / `{volunteer_ids}` audiences still work.
+  Email/SMS only — **push can't target a single team yet** (skipped with a note;
+  needs per-subscriber team attributes). Communications has a team picker + scope.
+  SW1 core can reuse the same function by inserting a volunteer_messages row with a
+  team audience. Source of truth for membership: `teams` + `team_members`.
+
 ## BACKLOG / next steps
 - **Set provider secrets** to make sending live: `TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM`
   (register `VOLUNTEER1`/`SPORTSWEB` as the platform sender), `ZEPTOMAIL_TOKEN/FROM`,

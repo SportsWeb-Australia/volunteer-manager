@@ -86,11 +86,46 @@ Deno.serve(async (req) => {
 
     await db.from("volunteer_messages").update({ status: "sending" }).eq("id", message_id);
 
-    // resolve recipients (SMS/email need per-person contact; push goes to all subscribers)
-    const aud = (msg.audience ?? {}) as { volunteer_ids?: string[]; statuses?: string[] };
-    let vq = db.from("volunteers").select("id,person_id,status,person:people(full_name,first_name,email,mobile,sms_marketing_consent,email_marketing_consent,marketing_opt_out,unsubscribe_token)").eq("club_id", club);
-    vq = aud.volunteer_ids?.length ? vq.in("id", aud.volunteer_ids) : vq.in("status", aud.statuses?.length ? aud.statuses : ["active"]);
-    const { data: vols } = await vq;
+    // Resolve recipients into a unified shape: { volunteer_id, person_id, person }.
+    // Audience options:
+    //   { statuses: [...] }              — volunteers by status (default ["active"])
+    //   { volunteer_ids: [...] }         — specific volunteers
+    //   { team_ids: [...], team_roles?, scope? } — club members of those teams via
+    //        team_members (scope "members" = everyone, "volunteers" = volunteers only).
+    //        This is the shared, club-wide capability (works beyond VolunteerOne).
+    const aud = (msg.audience ?? {}) as {
+      volunteer_ids?: string[]; statuses?: string[];
+      team_ids?: string[]; team_roles?: string[]; scope?: "members" | "volunteers";
+    };
+    const PCOLS = "full_name,first_name,email,mobile,sms_marketing_consent,email_marketing_consent,marketing_opt_out,unsubscribe_token";
+    type Rcpt = { volunteer_id: string | null; person_id: string; person: Record<string, unknown> | null };
+    const teamTargeted = Array.isArray(aud.team_ids) && aud.team_ids.length > 0;
+    let recipients: Rcpt[] = [];
+
+    if (teamTargeted) {
+      let tmq = db.from("team_members").select("person_id,role,status").eq("club_id", club).in("team_id", aud.team_ids!);
+      if (aud.team_roles?.length) tmq = tmq.in("role", aud.team_roles);
+      const { data: tms } = await tmq;
+      const personIds = [...new Set((tms ?? [])
+        .filter((m: { status?: string }) => m.status !== "inactive" && m.status !== "archived")
+        .map((m: { person_id: string }) => m.person_id).filter(Boolean))];
+      if (personIds.length) {
+        const [{ data: ppl }, { data: vmap }] = await Promise.all([
+          db.from("people").select(`id,${PCOLS}`).eq("club_id", club).in("id", personIds),
+          db.from("volunteers").select("id,person_id").eq("club_id", club).in("person_id", personIds),
+        ]);
+        const volByPerson = new Map((vmap ?? []).map((v: { id: string; person_id: string }) => [v.person_id, v.id]));
+        let people = (ppl ?? []) as Array<Record<string, unknown> & { id: string }>;
+        if (aud.scope === "volunteers") people = people.filter(p => volByPerson.has(p.id));
+        recipients = people.map(p => ({ volunteer_id: volByPerson.get(p.id) ?? null, person_id: p.id, person: p }));
+      }
+    } else {
+      let vq = db.from("volunteers").select(`id,person_id,status,person:people(${PCOLS})`).eq("club_id", club);
+      vq = aud.volunteer_ids?.length ? vq.in("id", aud.volunteer_ids) : vq.in("status", aud.statuses?.length ? aud.statuses : ["active"]);
+      const { data: vols } = await vq;
+      recipients = ((vols ?? []) as Array<{ id: string; person_id: string; person: Record<string, unknown> | null }>)
+        .map(v => ({ volunteer_id: v.id, person_id: v.person_id, person: v.person }));
+    }
 
     // SMS sender identity + allowance (Phase A metering). Fail-open if PATCH 3
     // isn't applied yet, so existing behaviour is never blocked by a missing meter.
@@ -124,6 +159,12 @@ Deno.serve(async (req) => {
       let sent = 0, failed = 0, overQuota = 0, lastErr: string | undefined;
 
       if (ch === "push") {
+        if (teamTargeted) {
+          skipped.push("push (team targeting not supported yet — use email/SMS)");
+          await db.from("volunteer_message_dispatches").update({ status: "skipped", error: "team targeting unsupported" }).eq("id", dispatchId!);
+          results[ch] = { sent: 0, failed: 0, error: "team targeting unsupported" };
+          continue;
+        }
         const r: SendResult = await sendPush(msg.title ?? msg.subject ?? "Club update", msg.body ?? "", undefined, club);
         r.ok ? sent++ : (failed++, lastErr = r.error);
         await db.from("volunteer_message_dispatches").update({
@@ -134,9 +175,9 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      for (const v of vols ?? []) {
-        const person = (v as any).person as Record<string, unknown> | null;
-        const who = nameOf(person);
+      for (const r0 of recipients) {
+        const person = r0.person;
+        const who = nameOf(person ?? undefined);
         const addr = ch === "sms" ? (person?.mobile as string) : (person?.email as string);
         if (!addr) continue;
 
@@ -159,7 +200,7 @@ Deno.serve(async (req) => {
         r.ok ? sent++ : (failed++, lastErr = r.error);
 
         await db.from("volunteer_message_recipients").insert({
-          club_id: club, message_id, dispatch_id: dispatchId, volunteer_id: v.id, person_id: v.person_id,
+          club_id: club, message_id, dispatch_id: dispatchId, volunteer_id: r0.volunteer_id, person_id: r0.person_id,
           channel: ch, address: addr, provider_message_id: r.providerId, error: r.error,
           cost_estimate: ch === "sms" && r.ok ? SMS_UNIT_COST : null,
           status: r.ok ? "sent" : "failed", sent_at: r.ok ? new Date().toISOString() : null,
@@ -189,7 +230,7 @@ Deno.serve(async (req) => {
     const finalStatus = totalSent === 0 ? "failed" : totalFailed > 0 ? "partially_sent" : "sent";
     await db.from("volunteer_messages").update({ status: finalStatus, sent_at: new Date().toISOString() }).eq("id", message_id);
 
-    return json(200, { status: finalStatus, channels: results, skipped, recipients: vols?.length ?? 0 });
+    return json(200, { status: finalStatus, channels: results, skipped, recipients: recipients.length });
   } catch (e) {
     return json(500, { error: e instanceof Error ? e.message : String(e) });
   }
